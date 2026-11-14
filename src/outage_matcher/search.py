@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 
 import psycopg
@@ -32,25 +33,33 @@ def search(
     k: int = 5,
     *,
     system_type: str | None = None,
+    exclude_chunk_ids: Collection[int] = (),
     embedder: Embedder | None = None,
 ) -> list[SearchHit]:
-    """Top-k chunks by cosine similarity for one model, optionally within one system type."""
+    """Top-k chunks by cosine similarity for one model, optionally within one system type.
+
+    `exclude_chunk_ids` hides chunks (the evals hold out a gold query's root-cause section)."""
     if model not in EMBEDDING_COLUMNS:
         raise ValueError(f"unknown model {model!r}; choose from {sorted(EMBEDDING_COLUMNS)}")
     if not 1 <= k <= MAX_K:
         raise ValueError(f"k must be between 1 and {MAX_K}")
     column = EMBEDDING_COLUMNS[model]
     vector = Vector((embedder or get_embedder(model)).embed_query(query))
-    where = "WHERE p.system_type = %s" if system_type else ""
+    conditions: list[str] = []
     params: list[object] = [vector]
     if system_type:
+        conditions.append("p.system_type = %s")
         params.append(system_type)
+    if exclude_chunk_ids:
+        conditions.append("c.id <> ALL(%s::int[])")
+        params.append(sorted(exclude_chunk_ids))
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     params += [vector, k]
     with conn.transaction():
         # The HNSW scan returns at most ef_search candidates, so raise it to cover k. With a
         # filter, the iterative scan keeps scanning until enough matching rows are found.
         conn.execute(f"SET LOCAL hnsw.ef_search = {max(k, DEFAULT_EF_SEARCH)}")
-        if system_type:
+        if conditions:
             conn.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
         rows = conn.execute(
             f"SELECT p.title, c.section_type, 1 - (c.{column} <=> %s) AS score, p.url, "

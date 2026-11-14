@@ -385,4 +385,6 @@ class OutageAgent:
         final = self.graph.invoke(state, {"recursion_limit": limit})
         answer = final["answer"]
         assert answer is not None
-        return AgentResult(question, answer, final["usage"], final["retries"], final["events"])
+        return AgentResult(
+            question, answer, final["usage"], final["retries"], final["events"], final["retrieved"]
+        )

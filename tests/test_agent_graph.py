@@ -349,3 +349,14 @@ def test_non_empty_text_blocks_are_echoed(search_log):
     make_agent(client, max_retries=0).ask(QUESTION)
     echoed = client.calls_for("retrieve")[1]["messages"][1]["content"]
     assert [b["type"] for b in echoed] == ["text", "tool_use"]
+
+
+def test_result_carries_every_retrieved_chunk_as_evidence(search_log):
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True, False)],
+        submit_answer=[answer([1])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert sorted(c.doc_id for c in result.evidence) == [1, 2]
+    assert result.evidence[0].text == "text of doc 1"

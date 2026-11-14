@@ -52,3 +52,4 @@ class AgentResult:
     usage: Usage
     retries: int
     events: list[dict[str, Any]]  # ordered trace of tool calls, grades, rewrites
+    evidence: list[Any] = field(default_factory=list)  # every RetrievedChunk seen, for the evals

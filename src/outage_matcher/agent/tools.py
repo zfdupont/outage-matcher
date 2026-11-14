@@ -48,6 +48,7 @@ class ToolContext:
     conn: Any  # psycopg.Connection (tests pass a fake)
     embedding_model: str = "bge"
     embedder: Embedder | None = None
+    exclude_chunk_ids: frozenset[int] = frozenset()  # chunks hidden from every tool (evals)
 
 
 class ToolArgumentError(ValueError):
@@ -168,8 +169,15 @@ def _run_search(ctx: ToolContext, query: str, k: int, system_type: str | None) -
             return _error(
                 "unknown_system_type", f"unknown system_type {system_type!r}; valid: {known}"
             )
+    extra = {"exclude_chunk_ids": ctx.exclude_chunk_ids} if ctx.exclude_chunk_ids else {}
     hits = search_chunks(
-        ctx.conn, query, ctx.embedding_model, k, system_type=system_type, embedder=ctx.embedder
+        ctx.conn,
+        query,
+        ctx.embedding_model,
+        k,
+        system_type=system_type,
+        embedder=ctx.embedder,
+        **extra,
     )
     chunks = [
         RetrievedChunk(
@@ -198,8 +206,12 @@ def get_postmortem(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
     if meta is None:
         return _error("not_found", f"no postmortem with doc_id {doc_id}")
     title, url, system_type = meta
+    hidden = sorted(ctx.exclude_chunk_ids)
     rows = ctx.conn.execute(
-        "SELECT section_type, text FROM chunks WHERE postmortem_id = %s ORDER BY ord", (doc_id,)
+        "SELECT section_type, text FROM chunks WHERE postmortem_id = %s"
+        + (" AND id <> ALL(%s::int[])" if hidden else "")
+        + " ORDER BY ord",
+        (doc_id, hidden) if hidden else (doc_id,),
     ).fetchall()
     parts: list[str] = []
     used = 0
