@@ -37,13 +37,28 @@
    "worktree": "/Users/zfdupont/outage-matcher-factory/002-m2-agent",
    "builder": "",
    "lane": "milestone",
-   "stage": "build",
-   "round": 1,
-   "rework": 0,
-   "reviews": {},
-   "history": [],
+   "stage": "merged",
+   "round": 2,
+   "rework": 1,
+   "reviews": {
+    "rules": "PASS",
+    "logic": "PASS",
+    "maintainability": "PASS",
+    "eval-rigor": "skipped",
+    "api-contract": "skipped"
+   },
+   "history": [
+    {
+     "round": 1,
+     "reviews": {
+      "rules": "PASS",
+      "logic": "CHANGES",
+      "maintainability": "PASS"
+     }
+    }
+   ],
    "note": "",
-   "updated": "2026-11-14T04:25:31.391898+00:00"
+   "updated": "2026-11-14T04:38:58.056963+00:00"
   },
   {
    "id": "003-m2b-ops-skeleton",

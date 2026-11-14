@@ -32,3 +32,23 @@ Notes:
 - The default model name `claude-haiku-5-5` comes from the spec and was not verified against the live API.
 - Design choice to review: `get_postmortem` registers one `full_document` chunk (text capped at 6000 chars) as retrieved evidence, so it is graded and citable like search hits; `filter_by_system_type` without a query only lists documents and registers nothing.
 - Commits carry no Co-Authored-By line, per the job instructions.
+
+## Round 2
+Commits:
+- 06f5ac6 Fail ask on backend search failure instead of reporting no match
+- a0a9158 Explicit Anthropic client timeout and retry count
+- 05fc528 Skip empty text blocks when echoing, sort deps
+
+Changed: src/outage_matcher/agent/{graph,models,tools}.py, src/outage_matcher/{config,cli}.py, .env.example, CLAUDE.md, pyproject.toml, tests/{test_agent_graph,test_cli,test_config}.py. The merged-in main (M2b) is untouched and still merged.
+
+Review items addressed:
+- Logic 1 (backend failure reported as no-match) -> `retrieve` collects `tool_failed` results (constant `BACKEND_ERROR` in tools.py, model mistakes such as invalid_arguments and not_found are excluded). If a retrieve pass found no chunks and had at least one backend failure, it raises the new `RetrievalError` ("search failed: <message>; this is not a no-match result") and the graph stops without retrying or grading. A failure the model recovers from within the same pass (a later successful search) is not an error. `RetrievalError` is a `RuntimeError`, so `main` prints a one-line `error: ...` and exits 1. Tests: test_backend_failure_raises_instead_of_reporting_no_match (search raises), test_backend_failure_after_an_empty_search_still_raises, test_backend_failure_recovered_within_the_pass_is_not_an_error, test_model_mistakes_are_not_backend_failures, test_ask_search_failure_is_a_one_line_error_not_a_no_match.
+- Logic 2 (no client timeout or retry policy) -> `AgentConfig` gains `request_timeout` (default 60 s, env `AGENT_REQUEST_TIMEOUT`, min 1) and `api_max_retries` (default 2, env `AGENT_API_MAX_RETRIES`, min 0); both are in `.env.example` and CLAUDE.md. New `cli._make_client` builds `anthropic.Anthropic(api_key, timeout, max_retries)`; `_build_agent` now takes the client. Tests: test_client_is_built_with_explicit_timeout_and_retries (asserts client.timeout and max_retries), test_ask_builds_the_client_from_config, and config tests for defaults, env overrides and bad values.
+- Logic non-blocking (empty text block echo) -> `_block_dict` replaced by `_echo_blocks`, which skips empty or whitespace-only text blocks. Tests: test_empty_text_blocks_are_not_echoed_back_to_the_api, test_non_empty_text_blocks_are_echoed.
+- Maintainability nit 1 (redundant local `load_dotenv` in `cmd_serve`) -> removed (in commit a0a9158).
+- Maintainability nit 2 (`anthropic` imported in both `cmd_ask` and `_build_agent`) -> `_build_agent` no longer imports it; `anthropic` is imported only in `cmd_ask` (for the error handler) and `_make_client`.
+- Maintainability nit 3 (pyproject order) -> `langchain-core` now sorted before `langgraph`; `uv lock` reports no change to uv.lock.
+
+Commands: test (`uv run pytest -q`) -> 142 passed, 5 deselected. lint (`uv run ruff check .`) -> all checks passed. format (`uv run ruff format --check .`) -> 71 files already formatted.
+
+Notes: the real-API runs and transcripts remain undone (the key is still a placeholder), as in round 1. Commit messages have no attribution lines.

@@ -10,3 +10,7 @@
 - [ ] Add a lock around the lazy agent factory in api/app.py
 - [ ] Add a request timeout around agent.ask in /ask
 - [ ] Run CI once per PR instead of on both push and pull_request (.github/workflows/ci.yml)
+
+## Follow-ups from job 002-m2-agent
+- [ ] Record 3 real example transcripts under docs/examples/ and verify the default model name and tool_choice against the live API (needs ANTHROPIC_API_KEY)
+- [ ] Annotate _env_number in src/outage_matcher/agent/config.py
