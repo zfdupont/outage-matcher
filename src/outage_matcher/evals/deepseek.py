@@ -41,6 +41,15 @@ class TokenUsage:
         )
 
 
+class InvalidReplyError(DeepSeekError):
+    """The call succeeded but the reply is not the requested JSON object (for example cut off at
+    max_tokens). Unlike transport errors, asking again can help. `usage` is what the call cost."""
+
+    def __init__(self, message: str, usage: TokenUsage | None = None) -> None:
+        super().__init__(message)
+        self.usage = usage or TokenUsage()
+
+
 @dataclass(frozen=True)
 class ChatResult:
     data: dict[str, Any]  # the parsed JSON object the model returned
@@ -117,18 +126,20 @@ class DeepSeekClient:
                 "response_format": {"type": "json_object"},
             }
         )
-        try:
-            content = body["choices"][0]["message"]["content"] or ""
-        except (KeyError, IndexError, TypeError) as exc:
-            raise DeepSeekError(f"unexpected response shape: {str(body)[:200]}") from exc
         used = body.get("usage") or {}
         usage = TokenUsage(
             int(used.get("prompt_tokens") or 0), int(used.get("completion_tokens") or 0), 1
         )
         try:
+            content = body["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError) as exc:
+            raise InvalidReplyError(f"unexpected response shape: {str(body)[:200]}", usage) from exc
+        try:
             data = json.loads(content)
         except ValueError as exc:
-            raise DeepSeekError(f"model reply was not valid JSON: {content[:200]!r}") from exc
+            raise InvalidReplyError(
+                f"model reply was not valid JSON: {content[:200]!r}", usage
+            ) from exc
         if not isinstance(data, dict):
-            raise DeepSeekError(f"model reply was not a JSON object: {content[:200]!r}")
+            raise InvalidReplyError(f"model reply was not a JSON object: {content[:200]!r}", usage)
         return ChatResult(data, content, usage)

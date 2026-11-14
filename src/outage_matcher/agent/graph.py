@@ -385,6 +385,8 @@ class OutageAgent:
         final = self.graph.invoke(state, {"recursion_limit": limit})
         answer = final["answer"]
         assert answer is not None
+        # Evidence for the evals: the excerpts the answerer saw first, then everything else.
+        evidence = _merge(final["relevant"][:MAX_ANSWER_CHUNKS], final["retrieved"])
         return AgentResult(
-            question, answer, final["usage"], final["retries"], final["events"], final["retrieved"]
+            question, answer, final["usage"], final["retries"], final["events"], evidence
         )

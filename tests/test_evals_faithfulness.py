@@ -6,7 +6,12 @@ from outage_matcher.agent.models import AgentAnswer, AgentResult, Citation, Retr
 from outage_matcher.agent.tools import RetrievedChunk
 from outage_matcher.evals import corpus as corpus_mod
 from outage_matcher.evals import faithfulness, run_faithfulness
-from outage_matcher.evals.deepseek import ChatResult, DeepSeekError, TokenUsage
+from outage_matcher.evals.deepseek import (
+    ChatResult,
+    DeepSeekError,
+    InvalidReplyError,
+    TokenUsage,
+)
 from outage_matcher.evals.gold import write_gold
 from test_evals_retrieval import gold_row
 
@@ -64,6 +69,27 @@ def test_cited_evidence_truncates_long_chunks_and_caps_the_total():
     assert sum(len(c.text) for c in evidence) <= faithfulness.MAX_EVIDENCE_CHARS
 
 
+def test_cited_evidence_skips_a_chunk_that_does_not_fit_but_keeps_later_small_ones():
+    fillers = [chunk(1, f"{i}" + "x" * 2899, "impact") for i in range(5)]  # 5 x 2900 = 14500
+    too_big = chunk(1, "y" * faithfulness.EVIDENCE_CHARS, "other")  # would pass the 15000 cap
+    small_answer_chunk = chunk(1, "the chunk the answer used", "root_cause")
+    evidence = faithfulness.cited_evidence(
+        agent_result(evidence=[*fillers, too_big, small_answer_chunk])
+    )
+    texts = [c.text for c in evidence]
+    assert too_big.text not in texts
+    assert "the chunk the answer used" in texts
+
+
+def test_cited_evidence_keeps_the_order_of_the_result_so_seen_chunks_win_the_budget():
+    big = "x" * faithfulness.EVIDENCE_CHARS
+    seen_first = [chunk(1, "seen by the answerer", "root_cause")]
+    rest = [chunk(1, f"{i}" + big, "impact") for i in range(10)]
+    texts = [c.text for c in faithfulness.cited_evidence(agent_result(evidence=seen_first + rest))]
+    assert texts[0] == "seen by the answerer"
+    assert sum(len(t) for t in texts) <= faithfulness.MAX_EVIDENCE_CHARS
+
+
 def test_judge_prompt_contains_excerpts_and_the_answer_text():
     result = agent_result()
     prompt = faithfulness.judge_prompt(result, faithfulness.cited_evidence(result))
@@ -81,6 +107,30 @@ def test_judge_answer_uses_temperature_zero_and_returns_claims_and_usage():
     ]
     assert judge.calls[0]["temperature"] == 0.0
     assert judgment.usage == TokenUsage(50, 10, 1)
+
+
+def test_judge_answer_retries_once_when_the_reply_is_not_json_or_cut_off():
+    cut = InvalidReplyError("model reply was not valid JSON", TokenUsage(40, 4000, 1))
+    judge = FakeJudge(cut, verdict(True))
+    judgment = faithfulness.judge_answer(judge, agent_result())
+    assert len(judge.calls) == 2 and len(judgment.claims) == 1
+    # the cost of the failed attempt is counted too
+    assert judgment.usage == TokenUsage(90, 4010, 2)
+    assert all(c["temperature"] == 0.0 for c in judge.calls)
+
+
+def test_judge_answer_gives_up_after_two_invalid_replies():
+    judge = FakeJudge(InvalidReplyError("bad one"), InvalidReplyError("bad two"))
+    with pytest.raises(DeepSeekError, match="no usable verdict.*bad two"):
+        faithfulness.judge_answer(judge, agent_result())
+    assert len(judge.calls) == 2
+
+
+def test_judge_answer_does_not_retry_transport_failures():
+    judge = FakeJudge(DeepSeekError("gave up after 4 attempts"), verdict(True))
+    with pytest.raises(DeepSeekError, match="gave up"):
+        faithfulness.judge_answer(judge, agent_result())
+    assert len(judge.calls) == 1
 
 
 def test_judge_answer_retries_once_on_a_malformed_verdict_then_gives_up():

@@ -7,12 +7,18 @@ from typing import Any
 
 from outage_matcher.agent.models import AgentResult
 from outage_matcher.agent.tools import RetrievedChunk
-from outage_matcher.evals.deepseek import DeepSeekClient, DeepSeekError, TokenUsage
+from outage_matcher.evals.deepseek import (
+    DeepSeekClient,
+    DeepSeekError,
+    InvalidReplyError,
+    TokenUsage,
+)
 
 JUDGE_TEMPERATURE = 0.0
 EVIDENCE_CHARS = 3000  # per chunk shown to the judge
 MAX_EVIDENCE_CHARS = 15000  # all cited chunks together
-JUDGE_ATTEMPTS = 2  # one retry when the verdict is not the requested JSON
+JUDGE_ATTEMPTS = 2  # one retry when the verdict is not usable JSON (invalid, cut off, bad shape)
+JUDGE_MAX_TOKENS = 4000
 
 JUDGE_SYSTEM = (
     "You are a strict fact-checker for an incident-diagnosis assistant. Always answer with a "
@@ -52,7 +58,10 @@ class Judgment:
 
 
 def cited_evidence(result: AgentResult) -> list[RetrievedChunk]:
-    """Chunks the agent retrieved that belong to a document its answer cites."""
+    """Chunks the agent retrieved that belong to a document its answer cites.
+
+    `result.evidence` lists the chunks the answerer saw first, so they are kept when the budget
+    runs out. A chunk that does not fit is skipped; smaller later ones can still fit."""
     cited = {c.doc_id for c in result.answer.citations}
     chunks: list[RetrievedChunk] = []
     seen: set[tuple[int, str, str]] = set()
@@ -64,7 +73,7 @@ def cited_evidence(result: AgentResult) -> list[RetrievedChunk]:
         seen.add(key)
         text = chunk.text[:EVIDENCE_CHARS]
         if used + len(text) > MAX_EVIDENCE_CHARS:
-            break
+            continue
         used += len(text)
         chunks.append(RetrievedChunk(**{**chunk.__dict__, "text": text}))
     return chunks
@@ -108,7 +117,14 @@ def judge_answer(client: DeepSeekClient, result: AgentResult) -> Judgment:
     usage = TokenUsage()
     problem = ""
     for _attempt in range(JUDGE_ATTEMPTS):
-        reply = client.chat_json(messages, temperature=JUDGE_TEMPERATURE, max_tokens=2000)
+        try:
+            reply = client.chat_json(
+                messages, temperature=JUDGE_TEMPERATURE, max_tokens=JUDGE_MAX_TOKENS
+            )
+        except InvalidReplyError as exc:  # transport failures were already retried by the client
+            usage = usage.plus(exc.usage)
+            problem = str(exc)
+            continue
         usage = usage.plus(reply.usage)
         try:
             return Judgment(parse_claims(reply.data), usage)

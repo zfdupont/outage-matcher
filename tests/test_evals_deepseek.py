@@ -52,6 +52,13 @@ def test_retries_transient_failures_then_succeeds():
     assert len(calls) == 3
 
 
+def test_transport_failures_are_not_invalid_replies():
+    client = make_client(lambda request: httpx.Response(500), max_retries=0)
+    with pytest.raises(DeepSeekError) as exc:
+        client.chat_json([])
+    assert not isinstance(exc.value, deepseek.InvalidReplyError)
+
+
 def test_gives_up_after_max_retries():
     calls = []
 
@@ -76,16 +83,18 @@ def test_client_error_is_not_retried():
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("content", ["not json", "[1, 2]", ""])
-def test_reply_that_is_not_a_json_object_is_an_error(content):
+@pytest.mark.parametrize("content", ["not json", "[1, 2]", "", '{"claims": [{"claim": "cut'])
+def test_reply_that_is_not_a_json_object_is_an_invalid_reply_that_keeps_its_usage(content):
     client = make_client(lambda request: httpx.Response(200, json=completion(content)))
-    with pytest.raises(DeepSeekError):
+    with pytest.raises(deepseek.InvalidReplyError) as exc:
         client.chat_json([])
+    assert exc.value.usage == deepseek.TokenUsage(11, 7, 1)
+    assert isinstance(exc.value, DeepSeekError)
 
 
 def test_unexpected_response_shape_is_an_error():
     client = make_client(lambda request: httpx.Response(200, json={"choices": []}))
-    with pytest.raises(DeepSeekError, match="shape"):
+    with pytest.raises(deepseek.InvalidReplyError, match="shape"):
         client.chat_json([])
 
 

@@ -360,3 +360,14 @@ def test_result_carries_every_retrieved_chunk_as_evidence(search_log):
     result = make_agent(client).ask(QUESTION)
     assert sorted(c.doc_id for c in result.evidence) == [1, 2]
     assert result.evidence[0].text == "text of doc 1"
+
+
+def test_evidence_lists_the_chunks_the_answerer_saw_before_the_rest(search_log):
+    # the grader accepts only doc 2, which was retrieved second
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(False, True)],
+        submit_answer=[answer([2])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert [c.doc_id for c in result.evidence] == [2, 1]
