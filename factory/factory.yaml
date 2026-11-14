@@ -1,0 +1,48 @@
+version: 1
+base: main
+context: [CLAUDE.md, README.md]
+rules: CLAUDE.md#Rules
+tests: thin
+commands:
+  test: uv run pytest -q
+  lint: uv run ruff check .
+  format: uv run ruff format --check .
+merge_gate: [test, lint, format]
+scout:
+  todo_paths: [src/, tests/]
+  docs: [README.md, CLAUDE.md, factory/milestones.md]
+  checks:
+    - every module that calls the Anthropic API or an embedding API has a test that runs offline with a fake client
+    - every metric reported in README.md is produced by a script under src/outage_matcher/evals/ and recorded in a results file
+builder:
+  runtime: claude
+  resume: session
+reviewers:
+  - name: rules
+    why: CLAUDE.md Rules forbid secrets, fabricated metrics, emojis and em-dashes, and require respecting source terms
+  - name: logic
+    why: retrieval, grading and citation logic must be correct on edge cases (empty results, missing sections)
+  - name: maintainability
+    why: src/ layout, ruff config and small modules per stage in CLAUDE.md Architecture
+  - name: eval-rigor
+    paths: [src/outage_matcher/evals/**, evals/**]
+    why: gold-set leakage and metric definitions (recall@k, MRR, faithfulness judge) decide whether reported numbers are honest
+  - name: api-contract
+    paths: [src/outage_matcher/api/**, Dockerfile, .github/**]
+    why: the FastAPI endpoint, Docker image (non-root, healthcheck) and CI regression gate are external interfaces
+qa: null
+escalate:
+  - {when: adds a dependency or changes the build toolchain, paths: [pyproject.toml, requirements.txt, requirements-dev.txt, uv.lock, Dockerfile]}
+  - {when: touches CI workflows, paths: [.github/**]}
+  - writes or logs any API key, token or .env value
+  - adds a data source without a recorded terms check
+  - changes a reported metric without a matching recorded run
+  - deletes tests
+related: []
+models:
+  spec-writer: fable high
+  approver: opus high
+  arbiter: fable high
+  builder: sonnet high
+  reviewers: sonnet high
+  scout: sonnet high
