@@ -26,6 +26,8 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
+# httpx.InvalidURL is not an HTTPError; one malformed list entry must not abort a run.
+FETCH_ERRORS = (httpx.HTTPError, httpx.InvalidURL)
 USER_AGENT = "outage-matcher-research/0.1 (local indexing of public postmortems)"
 DANLUU_URL = "https://raw.githubusercontent.com/danluu/post-mortems/master/README.md"
 GITHUB_TAG_URL = "https://github.blog/tag/github-availability-report/"
@@ -167,7 +169,10 @@ def fetch_url_for(url: str) -> str:
 
 
 def host_of(url: str) -> str:
-    return (urlparse(url).hostname or "").lower()
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except ValueError:  # for example an unbalanced IPv6 bracket in a list entry
+        return ""
 
 
 def source_for(url: str) -> str:
@@ -337,7 +342,7 @@ class Fetcher:
         signal_blocks = False
         try:
             resp = self.get(robots_url)
-        except httpx.HTTPError as exc:
+        except FETCH_ERRORS as exc:
             raise RobotsUnavailable(f"robots.txt fetch failed: {exc.__class__.__name__}") from exc
         if resp.status_code >= 500:
             raise RobotsUnavailable(f"robots.txt returned {resp.status_code}")
@@ -363,7 +368,9 @@ class Fetcher:
         return True, ""
 
 
-def collect_candidates(fetcher: Fetcher, *, seed: int = 0) -> list[Candidate]:
+def collect_candidates(
+    fetcher: Fetcher, *, seed: int = 0, log: Callable[[str], None] = lambda _msg: None
+) -> list[Candidate]:
     """Provider reports first, then the community list in a fixed shuffled order."""
     out: list[Candidate] = []
 
@@ -372,12 +379,15 @@ def collect_candidates(fetcher: Fetcher, *, seed: int = 0) -> list[Candidate]:
             page_url = url if n == 1 else f"{url}page/{n}/"
             try:
                 resp = fetcher.get(page_url)
-            except httpx.HTTPError:
+            except FETCH_ERRORS as exc:
+                log(f"index page failed: {page_url}: {exc.__class__.__name__}")
                 break
             if resp.status_code != 200:
+                log(f"index page stopped: {page_url}: http {resp.status_code}")
                 break
             links = extract_links(resp.text, page_url, pattern)
             if not links:
+                log(f"index page has no matching links: {page_url}")
                 break
             out.extend(Candidate(link, source) for link in links)
 
@@ -418,6 +428,10 @@ def fetch_one(
     fetcher: Fetcher, cand: Candidate, raw_dir: Path, today: date
 ) -> tuple[ManifestEntry | None, str]:
     """Fetch and validate one candidate. Returns (entry, "") or (None, failure reason)."""
+    try:
+        urlparse(cand.url)
+    except ValueError:
+        return None, "invalid url"
     reason = deny_reason(cand.url, cand.label)
     if reason:
         return None, f"denied: {reason}"
@@ -429,7 +443,7 @@ def fetch_one(
         return None, why
     try:
         resp = fetcher.get(fetch_url)
-    except httpx.HTTPError as exc:
+    except FETCH_ERRORS as exc:
         return None, f"fetch error: {exc.__class__.__name__}"
     if resp.status_code != 200:
         return None, f"http {resp.status_code}"
@@ -510,21 +524,24 @@ def collect(
     }
     entries = dict(existing)
     failures: list[dict[str, str]] = []
-    for cand in collect_candidates(fetcher):
-        if len(entries) >= max_docs:
-            break
-        if cand.url in entries:
-            continue
-        entry, reason = fetch_one(fetcher, cand, raw_dir, today)
-        if entry is None:
-            failures.append({"url": cand.url, "source": cand.source, "reason": reason})
-            log(f"skip {cand.url}: {reason}")
-            continue
-        entries[entry.url] = entry
-        log(f"ok {len(entries)}/{max_docs} {cand.source} {entry.title[:60]}")
-    write_manifest(entries.values(), manifest_path)
-    failures_path = data_dir / "collect_failures.jsonl"
-    failures_path.write_text(
-        "".join(json.dumps(f, ensure_ascii=False) + "\n" for f in failures), encoding="utf-8"
-    )
+    try:
+        for cand in collect_candidates(fetcher, log=log):
+            if len(entries) >= max_docs:
+                break
+            if cand.url in entries:
+                continue
+            entry, reason = fetch_one(fetcher, cand, raw_dir, today)
+            if entry is None:
+                failures.append({"url": cand.url, "source": cand.source, "reason": reason})
+                log(f"skip {cand.url}: {reason}")
+                continue
+            entries[entry.url] = entry
+            log(f"ok {len(entries)}/{max_docs} {cand.source} {entry.title[:60]}")
+    finally:
+        # Persist progress even if the run is interrupted, so a rerun resumes from here.
+        write_manifest(entries.values(), manifest_path)
+        failures_path = data_dir / "collect_failures.jsonl"
+        failures_path.write_text(
+            "".join(json.dumps(f, ensure_ascii=False) + "\n" for f in failures), encoding="utf-8"
+        )
     return list(entries.values()), failures

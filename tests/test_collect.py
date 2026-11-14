@@ -2,6 +2,7 @@ import json
 from datetime import date
 
 import httpx
+import pytest
 
 from outage_matcher.ingest import collect
 
@@ -250,3 +251,52 @@ def test_title_emoji_and_symbols_are_stripped():
     family = "<title>Outage \U0001f468\u200d\U0001f469 \u2764\ufe0f report</title>"
     assert collect.html_title(f"<html><head>{family}</head></html>") == "Outage report"
     assert collect.html_title("<title>It\u2019s down</title>") == "It\u2019s down"
+
+
+def test_malformed_urls_are_failures_not_aborts(tmp_path):
+    danluu = "[Bad](http://[bad/p). x\n[Good](https://good.test/p). y\n"
+    routes = {collect.DANLUU_URL: danluu, "https://good.test/p": page("Good postmortem")}
+    entries, failures = collect.collect(
+        fetcher=make_fetcher(routes), data_dir=tmp_path / "d", today=date(2026, 1, 1)
+    )
+    assert [e.url for e in entries] == ["https://good.test/p"]
+    assert [f["url"] for f in failures] == ["http://[bad/p"]
+    assert failures[0]["reason"] == "invalid url"
+
+
+def test_index_page_failures_are_logged(tmp_path):
+    logs: list[str] = []
+    routes = {collect.DANLUU_URL: ""}  # GitHub, Cloudflare and GCP index pages all 404
+    collect.collect(
+        fetcher=make_fetcher(routes),
+        data_dir=tmp_path / "d",
+        today=date(2026, 1, 1),
+        log=logs.append,
+    )
+    assert any("index page stopped" in line and "github.blog" in line for line in logs)
+    assert any("blog.cloudflare.com" in line for line in logs)
+    assert any("status.cloud.google.com" in line for line in logs)
+
+
+def test_progress_is_saved_when_a_run_is_interrupted(tmp_path, monkeypatch):
+    routes = {
+        collect.DANLUU_URL: "[A](https://a.test/p). x\n[B](https://b.test/p). y\n",
+        "https://a.test/p": page("First"),
+        "https://b.test/p": page("Second"),
+    }
+    real_fetch_one = collect.fetch_one
+    calls = []
+
+    def interrupt_on_second(fetcher, cand, raw_dir, today):
+        calls.append(cand.url)
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        return real_fetch_one(fetcher, cand, raw_dir, today)
+
+    monkeypatch.setattr(collect, "fetch_one", interrupt_on_second)
+    data = tmp_path / "d"
+    with pytest.raises(KeyboardInterrupt):
+        collect.collect(fetcher=make_fetcher(routes), data_dir=data, today=date(2026, 1, 1))
+    stored = collect.read_manifest(data / "manifest.jsonl")
+    assert [e.url for e in stored] == [calls[0]]
+    assert (data / "collect_failures.jsonl").exists()
