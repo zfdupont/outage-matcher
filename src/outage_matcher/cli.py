@@ -63,6 +63,15 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from outage_matcher.api.app import create_app
+
+    uvicorn.run(create_app(), host=args.host, port=args.port)
+    return 0
+
+
 def positive_int(value: str) -> int:
     number = int(value)
     if number < 1:
@@ -87,6 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
     find.add_argument("--k", type=positive_int, default=5)
     find.add_argument("--system-type", help="restrict to a system type label")
     find.set_defaults(func=cmd_search)
+
+    serve = sub.add_parser("serve", help="run the HTTP API")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=positive_int, default=8000)
+    serve.set_defaults(func=cmd_serve)
     return parser
 
 
