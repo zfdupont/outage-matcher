@@ -13,17 +13,38 @@ locally (see below) and which has unit tests.
    no `data/raw` because it is git-ignored. The cache is saved only if the whole job succeeds, so a
    run that could not fetch every page never poisons it.
 3. `outage-matcher ingest --skip-collect` builds the index from the manifest and `data/raw`.
-4. `gate index`: the index version (a hash of every document, chunk id and chunk text, as in
-   `evals/results/*.json`) must equal `index_version` in `evals/baseline.json`.
-5. `run_retrieval --model bge --chunking section` scores the gold set; `gate compare` checks the
-   result against the baseline.
+4. `gate index` checks that the index can be scored with the gold set (the hard-failure rule
+   below). A different index version alone only prints a warning.
+5. `run_retrieval --model bge --chunking section --allow-index-mismatch` scores the gold set (the
+   flag is needed because the gold set records the baseline's index version, and step 4 has already
+   checked the ids); `gate compare` checks the result against the baseline.
 
-### Behavior when the index differs from the baseline
+## The gate rule
 
-Recall and MRR are only comparable on the same index and gold set. If the freshly built index
-version differs from the baseline's (a source page changed, the manifest changed, or pages could
-not be fetched), the job fails at step 4 with a message that says so and tells the maintainer to
-refresh the baseline. It does not compare scores and does not pass silently.
+Recall and MRR are only comparable when the index still fits the gold set, but a tiny content
+change on a source page should not block a pull request.
+
+1. **Hard failure** (exit 1, with the instructions to refresh the baseline), only if the fresh
+   index is structurally incompatible with the gold set:
+   - a held-out chunk id of any gold query is missing from the index, or
+   - a relevant document id (the source document, or a confirmed near-duplicate) is missing, or
+   - the document count or the chunk count differs from the baseline's
+     (`index_documents`, `index_chunks` in `evals/baseline.json`) by more than 2 percent.
+2. **Otherwise** recall@1, 3, 5, 10 and MRR are compared with the baseline: the gate fails when any
+   is below its baseline value minus the tolerance in `evals/baseline.json` (0.05 absolute, about
+   one gold query; a score exactly at the floor passes). It also fails if the gold set file or the
+   run configuration (embedding model, chunking, reranker) differs from the baseline's, since those
+   scores are not comparable.
+3. **Index version differs alone**: the index version is a hash of every document, chunk id and
+   chunk text. When only it differs, the gate prints `WARNING: index version NEW differs from the
+   baseline's OLD ...` (in the log, the job summary and, on GitHub Actions, as an annotation) and
+   still passes if the metrics are within tolerance.
+
+The job fails in the cases of rule 1 and rule 2 and passes with a warning in rule 3. The report is
+printed and appended to the job summary. The warning is a prompt to refresh the baseline when
+convenient, not a failure.
+
+### Refreshing the baseline
 
 To refresh the baseline after an intended corpus change:
 
@@ -34,26 +55,15 @@ To refresh the baseline after an intended corpus change:
 
 then update the README Results section from `evals/results/summary.md` and commit.
 
-### Known caveat: the index version is strict
+### Why the version alone does not fail
 
-The version hashes the text of every chunk, so any change on a source page changes it. When this
-gate was built, a fresh `fetch-raw` and `ingest --skip-collect` of all 236 manifest pages (none
-failed) gave 235 documents and 4482 chunks, the same counts as the baseline, with the same ids, but
-a different index version (71c971dcffee against the baseline's 34c67d0bba77). The only difference
-was one chunk of one CircleCI forum page whose view counter had moved by one. `gate compare` on that
-index reported the same recall@k and MRR as the baseline and still failed on the version rule, as
-designed. Expect the first CI run on a cache miss, and any later run after a source page changes,
-to fail this way until the baseline is refreshed (or the baseline's `data/raw` is reused through the
-cache). Making the chunker ignore such counters would change chunk text and so would itself need a
-baseline refresh.
-
-### Behavior on the same index
-
-`gate compare` fails when any of recall@1, 3, 5, 10 or MRR is below its baseline value minus the
-tolerance in `evals/baseline.json` (0.05 absolute, about one gold query; a score exactly at the
-floor passes). It also fails if the gold set file or the run configuration (embedding model,
-chunking, reranker) differs from the baseline's, since those scores are not comparable. The report
-is printed and appended to the job summary.
+When this gate was built, a fresh `fetch-raw` and `ingest --skip-collect` of all 236 manifest
+pages (none failed) gave 235 documents and 4482 chunks, the same counts and ids as the baseline,
+but a different index version (71c971dcffee against the baseline's 34c67d0bba77). The only
+difference was one chunk of one CircleCI forum page whose view counter had moved by one, and
+`gate compare` on that index reported the same recall@k and MRR as the baseline. The owner decided
+that such drift must not fail the gate, hence rule 3. Making the chunker ignore such counters would
+change chunk text and would itself need a baseline refresh.
 
 ## Faithfulness job (LLM judge)
 
@@ -74,5 +84,5 @@ available to the retrieval job.
     uv run outage-matcher fetch-raw && uv run outage-matcher ingest --skip-collect
     uv run python -m outage_matcher.evals.gate index
     uv run python -m outage_matcher.evals.run_retrieval --model bge --name ci-bge-section \
-      --results-dir /tmp/eval-results
+      --results-dir /tmp/eval-results --allow-index-mismatch
     uv run python -m outage_matcher.evals.gate compare /tmp/eval-results/ci-bge-section.json

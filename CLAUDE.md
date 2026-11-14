@@ -25,7 +25,7 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 - `uv run python -m outage_matcher.evals.run_retrieval --model bge [--chunking neighbor] [--reranker]` - recall@k and MRR to `evals/results/<run>.json`
 - `uv run python evals/run_faithfulness.py [--limit N] [--dry-run]` - agent answers judged by DeepSeek (needs both API keys)
 - `uv run python -m outage_matcher.evals.summary` - write `evals/results/summary.md` and `evals/baseline.json` from the result files
-- `uv run python -m outage_matcher.evals.gate index` / `compare RESULT.json` - the CI regression checks against `evals/baseline.json` (see `docs/ci-eval-gate.md`)
+- `uv run python -m outage_matcher.evals.gate index` / `compare RESULT.json` - the CI checks against `evals/baseline.json`: fail on a structurally incompatible index or a metric drop beyond the tolerance, warn on a version change alone (see `docs/ci-eval-gate.md`)
 - `uv run python scripts/compare_embeddings_m1.py` - print the M1 two-model comparison tables
 
 ## Architecture

@@ -4,7 +4,8 @@
 host ports so the main development database was not touched. The database was filled with
 `outage-matcher fetch-raw` and `outage-matcher ingest --skip-collect` (236 manifest pages fetched,
 none failed; 235 documents, 4482 chunks). Its index version is `71c971dcffee`, not the baseline's
-`34c67d0bba77`; see the caveat in `docs/ci-eval-gate.md`. The API key came from `.env`; no secret
+`34c67d0bba77`; the gate treats a version change alone as a warning (see
+`docs/ci-eval-gate.md`). The API key came from `.env`; no secret
 appears below.
 
 ## Health
