@@ -75,14 +75,19 @@ jobs:
 
       - name: Ingest from the manifest
         run: uv run outage-matcher ingest --skip-collect
-      # A different index version than the baseline's (corpus drift, or pages that could not be
-      # fetched) fails here, with the instructions to refresh the baseline.
-      - name: Check the index is the baseline's
+      # Fails, with the instructions to refresh the baseline, only if the index is structurally
+      # incompatible with the gold set (a gold chunk or document id is missing, or the document or
+      # chunk count is more than 2 percent off the baseline's). A different index version alone
+      # (for example a forum view counter) only prints a WARNING.
+      - name: Check the index fits the gold set
         run: uv run python -m outage_matcher.evals.gate index --summary-file "$GITHUB_STEP_SUMMARY"
+      # --allow-index-mismatch: the gold set records the baseline's index version, and a changed
+      # version alone is tolerated; the previous step already checked the gold ids and counts.
       - name: Retrieval eval (bge, section chunking)
         run: >-
           uv run python -m outage_matcher.evals.run_retrieval --model bge --chunking section
           --name ci-bge-section --results-dir "$RUNNER_TEMP/eval-results"
+          --allow-index-mismatch
       - name: Compare with evals/baseline.json
         run: >-
           uv run python -m outage_matcher.evals.gate compare
@@ -160,7 +165,7 @@ jobs:
           key: fastembed-bge-minilm-v1
       - name: Ingest from the manifest
         run: uv run outage-matcher ingest --skip-collect
-      - name: Check the index is the baseline's
+      - name: Check the index fits the gold set
         run: uv run python -m outage_matcher.evals.gate index --summary-file "$GITHUB_STEP_SUMMARY"
       - name: Faithfulness eval
         env:
@@ -169,7 +174,8 @@ jobs:
           LIMIT: ${{ inputs.limit }}
         run: >-
           uv run python -m outage_matcher.evals.run_faithfulness
-          --out "$RUNNER_TEMP/eval-results/faithfulness.json" ${LIMIT:+--limit "$LIMIT"}
+          --out "$RUNNER_TEMP/eval-results/faithfulness.json" --allow-index-mismatch
+          ${LIMIT:+--limit "$LIMIT"}
       - name: Upload the result
         if: always()
         uses: actions/upload-artifact@v4

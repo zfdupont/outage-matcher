@@ -1,14 +1,22 @@
 """Regression gate for the retrieval eval, the same check CI runs (`.github/workflows/eval.yml`).
 
-    uv run python -m outage_matcher.evals.gate index           # is the index the baseline's?
+    uv run python -m outage_matcher.evals.gate index           # can the index be scored?
     uv run python -m outage_matcher.evals.gate compare RESULT  # did recall@k or MRR drop?
 
-`evals/baseline.json` stores the baseline metrics, the index version and gold set they were
-measured on, and a tolerance. Scores are only comparable on the same index and gold set, so:
+`evals/baseline.json` stores the baseline metrics, the index version and counts and gold set they
+were measured on, and a tolerance. The rule:
 
-- if the freshly built index version differs from the baseline's (the corpus drifted, or some
-  pages could not be fetched), the gate fails and says to refresh the baseline;
-- on the same index, it fails when any metric is below its baseline value minus the tolerance.
+1. Hard failure, with the instructions to refresh the baseline, only when the fresh index is
+   structurally incompatible with the gold set: a gold held-out chunk id or relevant document id is
+   missing from it, or its document or chunk count is more than 2 percent away from the
+   baseline's.
+2. Otherwise recall@k and MRR are compared with the baseline and the gate fails when any is more
+   than the tolerance below its baseline value.
+3. A different index version alone (a page changed a little, for example a view counter) only
+   prints a WARNING with the old and new version; the gate still passes if the metrics are within
+   tolerance.
+
+A different gold set file or run configuration is also a failure: those scores are not comparable.
 
 Exit code 0: pass; 1: fail; 2: a file is missing or unreadable.
 """
@@ -17,9 +25,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -27,9 +36,12 @@ import psycopg
 
 from outage_matcher import db
 from outage_matcher.evals import corpus as corpus_mod
+from outage_matcher.evals.gold import GOLD_PATH, GoldQuery, read_gold
 from outage_matcher.evals.summary import BASELINE_PATH, METRIC_KEYS
 
 EPSILON = 1e-9  # a score exactly at the floor passes; this absorbs float rounding
+MAX_COUNT_DRIFT = 0.02  # relative change of the document or chunk count that is still comparable
+MAX_LISTED = 10  # ids named in a message
 
 REFRESH_HELP = (
     "If the change is intended, refresh the baseline: rebuild the gold set "
@@ -54,8 +66,9 @@ class MetricCheck:
 
 @dataclass(frozen=True)
 class GateResult:
-    errors: list[str]  # why the gate cannot compare (index, gold or configuration differ)
-    checks: list[MetricCheck]
+    errors: list[str]  # hard failures: the result cannot be compared with the baseline
+    warnings: list[str] = field(default_factory=list)  # printed, never fail the gate
+    checks: list[MetricCheck] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -66,14 +79,72 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def index_mismatch(version: str, baseline: dict[str, Any]) -> str | None:
-    """A failure message when the index is not the one the baseline was recorded on."""
+def _listed(ids: Iterable[int]) -> str:
+    ordered = sorted(ids)
+    text = ", ".join(str(i) for i in ordered[:MAX_LISTED])
+    return text + (f" and {len(ordered) - MAX_LISTED} more" if len(ordered) > MAX_LISTED else "")
+
+
+def count_drift(documents: int, chunks: int, baseline: dict[str, Any]) -> list[str]:
+    """Problems when the document or chunk count moved more than 2 percent from the baseline's."""
+    problems = []
+    for label, now, then in (
+        ("document", documents, baseline["index_documents"]),
+        ("chunk", chunks, baseline["index_chunks"]),
+    ):
+        change = abs(now - then) / then if then else float("inf")
+        if change > MAX_COUNT_DRIFT:
+            problems.append(
+                f"the index has {now} {label}s but the baseline's has {then} "
+                f"({change:.1%} change, more than {MAX_COUNT_DRIFT:.0%})"
+            )
+    return problems
+
+
+def gold_ids(gold: Sequence[GoldQuery]) -> tuple[set[int], set[int]]:
+    """Every held-out chunk id and every relevant document id the gold set refers to."""
+    chunk_ids = {i for row in gold for i in row.held_out_chunk_ids}
+    doc_ids = {i for row in gold for i in row.relevant_doc_ids}
+    return chunk_ids, doc_ids
+
+
+def structural_problems(
+    gold: Sequence[GoldQuery],
+    present_chunk_ids: set[int],
+    present_doc_ids: set[int],
+    documents: int,
+    chunks: int,
+    baseline: dict[str, Any],
+) -> list[str]:
+    """Why the index cannot be scored with this gold set (empty when it can)."""
+    chunk_ids, doc_ids = gold_ids(gold)
+    problems = []
+    if chunk_ids - present_chunk_ids:
+        missing = chunk_ids - present_chunk_ids
+        problems.append(f"gold held-out chunk ids missing from the index: {_listed(missing)}")
+    if doc_ids - present_doc_ids:
+        missing = doc_ids - present_doc_ids
+        problems.append(f"gold relevant document ids missing from the index: {_listed(missing)}")
+    return problems + count_drift(documents, chunks, baseline)
+
+
+def version_warning(version: str, baseline: dict[str, Any]) -> str | None:
+    """A warning when the index is not byte-identical to the one the baseline was recorded on."""
     if version == baseline["index_version"]:
         return None
     return (
-        f"index version {version} differs from the baseline's {baseline['index_version']} "
-        "(the corpus changed, or some pages could not be fetched). "
-        "Scores on a different index are not comparable, so this fails instead of passing. "
+        f"index version {version} differs from the baseline's {baseline['index_version']}: some "
+        "page content changed since the baseline was recorded (for example a view counter). The "
+        "gold ids and counts are compatible, so the metrics are compared anyway. Refresh the "
+        "baseline when convenient."
+    )
+
+
+def _structural_error(problems: list[str]) -> str:
+    return (
+        "the index is not compatible with the gold set: "
+        + "; ".join(problems)
+        + ". "
         + REFRESH_HELP
     )
 
@@ -81,9 +152,9 @@ def index_mismatch(version: str, baseline: dict[str, Any]) -> str | None:
 def compare(result: dict[str, Any], baseline: dict[str, Any]) -> GateResult:
     """Check one retrieval result file against the baseline."""
     errors: list[str] = []
-    message = index_mismatch(result["index"]["version"], baseline)
-    if message:
-        errors.append(message)
+    drift = count_drift(result["index"]["documents"], result["index"]["chunks"], baseline)
+    if drift:
+        errors.append(_structural_error(drift))
     if result["gold"]["sha256"] != baseline["gold_sha256"]:
         errors.append(
             "the gold set differs from the one the baseline was measured on "
@@ -96,6 +167,7 @@ def compare(result: dict[str, Any], baseline: dict[str, Any]) -> GateResult:
                 f"the run's {key} is {result['config'].get(key)!r} but the baseline's is "
                 f"{baseline['config'].get(key)!r}; run the same configuration as the baseline"
             )
+    warning = version_warning(result["index"]["version"], baseline)
     tolerance = baseline["tolerance"]
     checks = [
         MetricCheck(
@@ -106,7 +178,7 @@ def compare(result: dict[str, Any], baseline: dict[str, Any]) -> GateResult:
         )
         for key in METRIC_KEYS
     ]
-    return GateResult(errors, checks)
+    return GateResult(errors, [warning] if warning else [], checks)
 
 
 def render(result: GateResult, tolerance: float, baseline_run: str) -> str:
@@ -122,6 +194,7 @@ def render(result: GateResult, tolerance: float, baseline_run: str) -> str:
             f"| {c.name} | {c.baseline:.3f} | {c.floor:.3f} | {c.current:.3f} | {status} |"
         )
     lines.append("")
+    lines += [f"WARNING: {w}" for w in result.warnings]
     if result.errors:
         lines += [f"FAIL: {e}" for e in result.errors]
     elif not result.passed:
@@ -130,6 +203,13 @@ def render(result: GateResult, tolerance: float, baseline_run: str) -> str:
     else:
         lines.append("PASS: no metric dropped more than the tolerance.")
     return "\n".join(lines)
+
+
+def _annotate_warnings(warnings: Iterable[str]) -> None:
+    """Show a warning in the GitHub Actions UI as well as in the log."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        for warning in warnings:
+            print(f"::warning title=index version changed::{warning}")
 
 
 def _append(path: Path | None, text: str) -> None:
@@ -146,20 +226,35 @@ def _load(path: Path, what: str) -> dict[str, Any] | None:
         return None
 
 
+def present_ids(conn: Any, chunk_ids: set[int], doc_ids: set[int]) -> tuple[set[int], set[int]]:
+    """Which of the gold's chunk ids and document ids exist in the index."""
+    chunks = conn.execute("SELECT id FROM chunks WHERE id = ANY(%s)", (sorted(chunk_ids),))
+    docs = conn.execute("SELECT id FROM postmortems WHERE id = ANY(%s)", (sorted(doc_ids),))
+    return {row[0] for row in chunks.fetchall()}, {row[0] for row in docs.fetchall()}
+
+
 def cmd_index(args: argparse.Namespace) -> int:
     baseline = _load(args.baseline, "baseline")
     if baseline is None:
         return 2
+    gold = read_gold(args.gold)
     with db.connect() as conn:
         info = corpus_mod.index_info(conn)
-    message = index_mismatch(info.version, baseline)
-    if message:
+        present = present_ids(conn, *gold_ids(gold))
+    problems = structural_problems(gold, *present, info.documents, info.chunks, baseline)
+    if problems:
+        message = _structural_error(problems)
         print(f"FAIL: {message}", file=sys.stderr)
         _append(args.summary_file, f"FAIL: {message}")
         return 1
+    warning = version_warning(info.version, baseline)
+    if warning:
+        print(f"WARNING: {warning}")
+        _append(args.summary_file, f"WARNING: {warning}")
+        _annotate_warnings([warning])
     print(
-        f"index {info.version} matches the baseline ({info.documents} documents, "
-        f"{info.chunks} chunks)"
+        f"index {info.version} is compatible with the gold set "
+        f"({info.documents} documents, {info.chunks} chunks)"
     )
     return 0
 
@@ -173,6 +268,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
     text = render(outcome, baseline["tolerance"], baseline["run"])
     print(text)
     _append(args.summary_file, text)
+    _annotate_warnings(outcome.warnings)
     return 0 if outcome.passed else 1
 
 
@@ -180,7 +276,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gate", description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     for name, func, help_text in (
-        ("index", cmd_index, "fail unless the loaded index is the baseline's"),
+        ("index", cmd_index, "fail if the index cannot be scored with the gold set"),
         ("compare", cmd_compare, "fail when a result is worse than the baseline allows"),
     ):
         cmd = sub.add_parser(name, help=help_text)
@@ -189,6 +285,8 @@ def build_parser() -> argparse.ArgumentParser:
             "--summary-file", type=Path, help="also append the report here ($GITHUB_STEP_SUMMARY)"
         )
         cmd.set_defaults(func=func)
+        if name == "index":
+            cmd.add_argument("--gold", type=Path, default=GOLD_PATH)
         if name == "compare":
             cmd.add_argument(
                 "result", type=Path, help="evals/results-style JSON from run_retrieval"
