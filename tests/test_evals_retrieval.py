@@ -32,9 +32,7 @@ def make_docs():
         chunks = tuple(
             ChunkRow(doc_id * 100 + i, i, st, f"d{doc_id}c{i}") for i, st in enumerate(specs)
         )
-        return DocRow(
-            doc_id, f"https://x.test/{doc_id}", f"Doc {doc_id}", "community", "net", chunks
-        )
+        return DocRow(doc_id, f"https://x.test/{doc_id}", f"Doc {doc_id}", "community", chunks)
 
     return [
         doc(1, ["summary", "impact", "root_cause"]),

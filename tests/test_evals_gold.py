@@ -20,7 +20,7 @@ def make_doc(doc_id=1, title="Edge outage", url="https://blog.examplecdn.test/a"
     chunks = [ChunkRow(10 * doc_id, 0, "summary", SYMPTOMS[0])]
     chunks.append(ChunkRow(10 * doc_id + 1, 1, "impact", SYMPTOMS[1]))
     chunks.append(ChunkRow(10 * doc_id + 2, 2, "root_cause", root))
-    return DocRow(doc_id, url, title, "community", "network", tuple(chunks))
+    return DocRow(doc_id, url, title, "community", tuple(chunks))
 
 
 class FakeDeepSeek:
@@ -55,7 +55,7 @@ def test_eligibility_needs_root_cause_text_and_remaining_chunks():
     assert gold.is_eligible(make_doc())
     assert not gold.is_eligible(make_doc(root="Root cause\nshort"))
     assert not gold.is_eligible(make_doc(title="GitHub availability report: May 2026"))
-    only_root = DocRow(1, "https://a.test", "T", "s", "x", (ChunkRow(1, 0, "root_cause", ROOT),))
+    only_root = DocRow(1, "https://a.test", "T", "s", (ChunkRow(1, 0, "root_cause", ROOT),))
     assert not gold.is_eligible(only_root)
 
 

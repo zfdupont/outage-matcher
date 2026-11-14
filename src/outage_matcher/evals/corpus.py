@@ -21,7 +21,6 @@ class DocRow:
     url: str
     title: str
     source: str
-    system_type: str
     chunks: tuple[ChunkRow, ...]
 
     def chunks_of(self, section_type: str) -> list[ChunkRow]:
@@ -45,9 +44,7 @@ class IndexInfo:
 
 def load_docs(conn: psycopg.Connection) -> list[DocRow]:
     """Every document with its chunks in order (no embeddings), ordered by document id."""
-    docs = conn.execute(
-        "SELECT id, url, title, source, system_type FROM postmortems ORDER BY id"
-    ).fetchall()
+    docs = conn.execute("SELECT id, url, title, source FROM postmortems ORDER BY id").fetchall()
     by_doc: dict[int, list[ChunkRow]] = {row[0]: [] for row in docs}
     rows = conn.execute(
         "SELECT postmortem_id, id, ord, section_type, text FROM chunks ORDER BY postmortem_id, ord"

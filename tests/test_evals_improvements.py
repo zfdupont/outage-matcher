@@ -25,7 +25,6 @@ def texts_corpus():
             f"https://x.test/{d}",
             f"Doc {d}",
             "community",
-            "net",
             tuple(
                 ChunkRow(d * 10 + i, i, "other", f"{'d' + str(d)}-chunk{i}-" + "x" * 300)
                 for i in range(3)
