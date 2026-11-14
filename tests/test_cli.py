@@ -334,3 +334,13 @@ def test_fetch_raw_without_a_manifest_fails(monkeypatch, capsys):
     monkeypatch.setattr(cli.collect_mod, "read_manifest", lambda: [])
     assert cli.main(["fetch-raw"]) == 1
     assert "no manifest" in capsys.readouterr().err
+
+
+def test_fetch_raw_strict_passes_when_every_page_is_there(monkeypatch):
+    from outage_matcher.ingest.collect import FetchReport
+
+    monkeypatch.setattr(cli.collect_mod, "read_manifest", lambda: [make_entry()])
+    monkeypatch.setattr(
+        cli.collect_mod, "fetch_missing_pages", lambda entries, log=None: FetchReport(1, 0, [])
+    )
+    assert cli.main(["fetch-raw", "--strict"]) == 0

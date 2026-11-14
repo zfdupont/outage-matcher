@@ -7,11 +7,13 @@ locally (see below) and which has unit tests.
 ## Retrieval gate (no secrets, every pull request)
 
 1. Start a `pgvector/pgvector:pg16` service container (trust auth, reachable only from the job).
-2. Restore `data/raw` with `actions/cache`, keyed on `hashFiles('data/manifest.jsonl')`. On a cache
-   miss, `outage-matcher fetch-raw` downloads exactly the pages the committed manifest lists
-   (same robots and size checks as the collector; the manifest is not modified). A fresh clone has
-   no `data/raw` because it is git-ignored. The cache is saved only if the whole job succeeds, so a
-   run that could not fetch every page never poisons it.
+2. Restore `data/raw` with `actions/cache`, keyed on `hashFiles('data/manifest.jsonl')`, then run
+   `outage-matcher fetch-raw --strict` on every run. It downloads only the manifest pages that are
+   missing from `data/raw` (same robots and size checks as the collector; the manifest is not
+   modified), so it does nothing on a complete cache and everything on a miss. `--strict` fails the
+   job unless every manifest page is present afterwards, so a partial cache is completed or fails
+   loudly instead of being cached for good. A fresh clone has no `data/raw` because it is
+   git-ignored. The cache is saved only if the whole job succeeds.
 3. `outage-matcher ingest --skip-collect` builds the index from the manifest and `data/raw`.
 4. `gate index` checks that the index can be scored with the gold set (the hard-failure rule
    below). A different index version alone only prints a warning.
@@ -28,6 +30,11 @@ change on a source page should not block a pull request.
    index is structurally incompatible with the gold set:
    - a held-out chunk id of any gold query is missing from the index, or
    - a relevant document id (the source document, or a confirmed near-duplicate) is missing, or
+   - a gold chunk id exists but names another chunk: for every gold row, the chunk's document id and
+     URL must equal the row's `doc_id` and `doc_url` and its `ord` must be one of the row's
+     `held_out_ords`. Chunk ids are serial numbers (`TRUNCATE ... RESTART IDENTITY` on ingest), so a
+     page that gains or loses one chunk shifts every later id while all of them still exist; without
+     this check the held-out chunks would stay searchable and the wrong ones would be hidden, or
    - the document count or the chunk count differs from the baseline's
      (`index_documents`, `index_chunks` in `evals/baseline.json`) by more than 2 percent.
 2. **Otherwise** recall@1, 3, 5, 10 and MRR are compared with the baseline: the gate fails when any
@@ -65,17 +72,19 @@ difference was one chunk of one CircleCI forum page whose view counter had moved
 that such drift must not fail the gate, hence rule 3. Making the chunker ignore such counters would
 change chunk text and would itself need a baseline refresh.
 
-## Faithfulness job (LLM judge)
+## Faithfulness job (LLM judge, manual only)
 
-Runs only when started with `workflow_dispatch`, or on a pull request when both `ANTHROPIC_API_KEY`
-and `DEEPSEEK_API_KEY` exist as GitHub secrets (checked by a small job that only tests whether the
-values are non-empty). It needs the retrieval job to pass, rebuilds the same index and runs
-`run_faithfulness`. It reports a result and has no threshold: it is a single draw of a
-nondeterministic agent (see the README Results section). `workflow_dispatch` takes an optional
-`limit` input to run only the first N gold queries and cap the cost. Pull requests from forks get
-no secrets, so the job is skipped for them.
+Runs only when started with `workflow_dispatch`; it never runs on pull requests. The repository is
+public, the job spends API credits, and code from a pull request branch (the ingest and
+`run_faithfulness` modules, the lockfile) would run with the keys in its environment. It needs the
+retrieval job to pass, first checks that both `ANTHROPIC_API_KEY` and `DEEPSEEK_API_KEY` exist as
+GitHub secrets (failing before the slow ingest if not; it only tests that the values are
+non-empty), rebuilds the same index and runs `run_faithfulness`. It reports a result and has no
+threshold: it is a single draw of a nondeterministic agent (see the README Results section).
+`workflow_dispatch` takes an optional `limit` input to run only the first N gold queries and cap the
+cost.
 
-Secrets are read from `secrets.*` only in the steps that need them, are never printed, and are not
+Secrets are read from `secrets.*` only in two steps of this job, are never printed, and are not
 available to the retrieval job.
 
 ## Run the same check locally

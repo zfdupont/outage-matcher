@@ -187,7 +187,11 @@ def build_parser() -> argparse.ArgumentParser:
     fetch = sub.add_parser(
         "fetch-raw", help="fetch the manifest's pages that are missing from data/raw"
     )
-    fetch.add_argument("--strict", action="store_true", help="exit 1 if any page is not fetched")
+    fetch.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 unless every manifest page is in data/raw afterwards",
+    )
     fetch.set_defaults(func=cmd_fetch_raw)
 
     find = sub.add_parser("search", help="search indexed postmortems")

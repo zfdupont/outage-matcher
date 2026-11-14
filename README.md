@@ -83,19 +83,22 @@ has and has not been verified, are in `docs/tracing.md`.
 ## CI eval gate (M4)
 
 `.github/workflows/eval.yml` builds the index in CI from the committed manifest (caching `data/raw`
-keyed on the manifest hash, fetching only on a cache miss), runs the retrieval eval and compares it
-with `evals/baseline.json`. The rule:
+keyed on the manifest hash, then `fetch-raw --strict` on every run to fetch whatever is missing),
+runs the retrieval eval and compares it with `evals/baseline.json`. The rule:
 
 - The job fails, with a message to refresh the baseline, only if the fresh index is structurally
-  incompatible with the gold set: a gold held-out chunk id or relevant document id is missing, or the
-  document or chunk count is more than 2 percent from the baseline's.
+  incompatible with the gold set: a gold held-out chunk id or relevant document id is missing, a gold
+  chunk id now points at another document, URL or position than the gold row says (chunk ids are
+  serial numbers and shift when a page changes its chunk count), or the document or chunk count is
+  more than 2 percent from the baseline's.
 - Otherwise it fails when recall@k or MRR is more than the tolerance (0.05, absolute) below the
   baseline.
 - A different index version alone (for example a forum page's view counter changed) only prints a
   `WARNING` with the old and new version; the job still passes if the metrics are within tolerance.
 
-The LLM-judged faithfulness job runs only on manual dispatch or when both API-key secrets exist. The
-workflow has not been run on GitHub; the comparison logic is `outage_matcher.evals.gate`, covered by
+The LLM-judged faithfulness job runs only on manual dispatch (never on pull requests: the
+repository is public and the job spends credits and uses the API-key secrets). The workflow has not
+been run on GitHub; the comparison logic is `outage_matcher.evals.gate`, covered by
 unit tests. See `docs/ci-eval-gate.md`.
 
 ## Why pgvector over Chroma

@@ -17,7 +17,7 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 - `uv run outage-matcher ingest` - collect, chunk, embed and index postmortems (`--skip-collect` reuses `data/raw`)
 - `uv run outage-matcher search "<query>" [--model bge|minilm] [--k 5]` - search the index (both models by default)
 - `uv run outage-matcher ask "<incident description>" [--transcript PATH]` - run the agent (needs a real `ANTHROPIC_API_KEY`; model via `AGENT_MODEL`, retry cap via `AGENT_MAX_RETRIES`, API timeout seconds via `AGENT_REQUEST_TIMEOUT`, SDK retries via `AGENT_API_MAX_RETRIES`)
-- `uv run outage-matcher fetch-raw` - download the manifest's pages that are missing from `data/raw` (what CI does on a cache miss)
+- `uv run outage-matcher fetch-raw` - download the manifest's pages that are missing from `data/raw` (`--strict` exits 1 unless every page is there; CI runs it on every job)
 - `uv run outage-matcher serve [--host H] [--port P]` - run the API (`GET /health`, `POST /ask` runs the agent; `/ask` is 503 without a real `ANTHROPIC_API_KEY`)
 - `docker compose up --build` - db plus the API container (host port `API_PORT`, default 8000)
 - `uv run pytest -m db -o addopts=""` - opt-in tests that need the running Postgres container

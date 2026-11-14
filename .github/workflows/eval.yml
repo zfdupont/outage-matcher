@@ -1,8 +1,10 @@
 # Retrieval regression gate and the optional LLM-judged faithfulness run.
 #
 # [ESCALATE] This workflow handles secrets (ANTHROPIC_API_KEY, DEEPSEEK_API_KEY); the owner reads it
-# before merge. Secrets are read only from GitHub secrets, only in the steps that need them, and are
-# never printed. The retrieval job uses no secrets, so it also runs on pull requests from forks.
+# before merge. Secrets are read only from GitHub secrets, only in the steps of the faithfulness job
+# that need them, and are never printed. That job runs on workflow_dispatch only: the repository is
+# public, it spends credits, and code from a pull request branch would run with the keys in its
+# environment. The retrieval job uses no secrets, so it also runs on pull requests from forks.
 #
 # This file has not been run on GitHub. The same checks run locally:
 #   uv run python -m outage_matcher.evals.gate index
@@ -56,17 +58,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      # data/raw is git-ignored, so a fresh clone has none. It is cached by the manifest's hash and
-      # fetched only on a cache miss. The cache is saved only when the whole job passes.
+      # data/raw is git-ignored, so a fresh clone has none. It is cached by the manifest's hash. The
+      # fetch step runs every time: it downloads only the pages missing from data/raw (nothing on a
+      # complete cache, everything on a miss), and --strict fails the job if any manifest page is
+      # still missing, so an incomplete cache is completed or fails loudly. The cache is saved only
+      # when the whole job passes.
       - name: Restore raw pages
-        id: raw
         uses: actions/cache@v4
         with:
           path: data/raw
           key: raw-${{ hashFiles('data/manifest.jsonl') }}
-      - name: Fetch raw pages (cache miss only)
-        if: steps.raw.outputs.cache-hit != 'true'
-        run: uv run outage-matcher fetch-raw
+      - name: Fetch the manifest's missing pages
+        run: uv run outage-matcher fetch-raw --strict
       - name: Restore embedding models
         uses: actions/cache@v4
         with:
@@ -100,29 +103,12 @@ jobs:
           path: ${{ runner.temp }}/eval-results/
           if-no-files-found: ignore
 
-  keys:
-    name: check for API keys
-    runs-on: ubuntu-latest
-    outputs:
-      present: ${{ steps.check.outputs.present }}
-    steps:
-      - id: check
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        # Tests only whether the values are non-empty; they are never printed.
-        run: |
-          if [ -n "$ANTHROPIC_API_KEY" ] && [ -n "$DEEPSEEK_API_KEY" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-          fi
-
   faithfulness:
     name: faithfulness (LLM judge)
-    needs: [retrieval, keys]
-    # Runs when started by hand, or when both secrets exist (forks get no secrets, so it is skipped).
-    if: github.event_name == 'workflow_dispatch' || needs.keys.outputs.present == 'true'
+    needs: retrieval
+    # Started by hand only. Never on pull requests: the repository is public, the job spends API
+    # credits, and a pull request branch can change the code that runs with the keys.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     services:
@@ -143,6 +129,17 @@ jobs:
       DATABASE_URL: postgresql://outage@localhost:5432/outage
       FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
     steps:
+      # Fail fast, before the slow ingest, if a secret is not configured. Only tests that the
+      # values are non-empty; they are never printed.
+      - name: Require both API keys
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY and DEEPSEEK_API_KEY must both be set as repository secrets"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
@@ -150,14 +147,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
       - name: Restore raw pages
-        id: raw
         uses: actions/cache@v4
         with:
           path: data/raw
           key: raw-${{ hashFiles('data/manifest.jsonl') }}
-      - name: Fetch raw pages (cache miss only)
-        if: steps.raw.outputs.cache-hit != 'true'
-        run: uv run outage-matcher fetch-raw
+      - name: Fetch the manifest's missing pages
+        run: uv run outage-matcher fetch-raw --strict
       - name: Restore embedding models
         uses: actions/cache@v4
         with:
