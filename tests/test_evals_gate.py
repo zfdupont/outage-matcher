@@ -55,12 +55,12 @@ def make_gold(*rows) -> list[GoldQuery]:
                     "id": f"q{n:03d}",
                     "query": "q",
                     "doc_id": doc_id,
-                    "doc_url": "u",
+                    "doc_url": f"https://x.test/{doc_id}",
                     "doc_title": "t",
                     "source": "s",
                     "held_out_chunk_id": chunk_ids[0],
                     "held_out_chunk_ids": chunk_ids,
-                    "held_out_ords": [0],
+                    "held_out_ords": list(range(len(chunk_ids))),
                     "held_out_heading": "h",
                     "index_version": "idx0",
                     "generation": {},
@@ -83,6 +83,13 @@ def make_gold(*rows) -> list[GoldQuery]:
 
 
 GOLD = make_gold((1, [10, 11], []), (2, [20], [3]))
+# What a compatible index holds for those gold ids: the right document, URL and position.
+GOOD_CHUNKS = {
+    10: gate.ChunkRow(1, "https://x.test/1", 0),
+    11: gate.ChunkRow(1, "https://x.test/1", 1),
+    20: gate.ChunkRow(2, "https://x.test/2", 0),
+}
+GOOD_DOCS = {1, 2, 3}
 
 
 # ----- the rule: version, metrics -------------------------------------------------------------
@@ -159,27 +166,58 @@ def test_count_drift_beyond_two_percent_is_a_hard_failure_with_refresh_instructi
     assert "900 chunks but the baseline's has 1000" in outcome.errors[0]
 
 
+def problems_for(chunks, docs=GOOD_DOCS, documents=200, count=1000):
+    return gate.structural_problems(GOLD, chunks, docs, documents, count, make_baseline())
+
+
 def test_missing_gold_chunk_id_is_a_hard_failure_naming_the_id():
-    problems = gate.structural_problems(GOLD, {10, 20}, {1, 2, 3}, 200, 1000, make_baseline())
+    problems = problems_for({k: v for k, v in GOOD_CHUNKS.items() if k != 11})
     assert len(problems) == 1
     assert "held-out chunk ids missing" in problems[0] and "11" in problems[0]
 
 
 def test_missing_relevant_doc_id_is_a_hard_failure_but_unconfirmed_duplicates_do_not_count():
     # doc 3 is a confirmed near-duplicate of query 2, doc 999 is unconfirmed.
-    problems = gate.structural_problems(GOLD, {10, 11, 20}, {1, 2}, 200, 1000, make_baseline())
+    problems = problems_for(GOOD_CHUNKS, {1, 2})
     assert len(problems) == 1
     assert "relevant document ids missing" in problems[0] and "3" in problems[0]
     assert "999" not in problems[0]
 
 
 def test_compatible_index_has_no_structural_problems():
-    ok = gate.structural_problems(GOLD, {10, 11, 20, 30}, {1, 2, 3, 4}, 200, 1000, make_baseline())
-    assert ok == []
+    assert problems_for(GOOD_CHUNKS) == []
+
+
+def test_shifted_serial_ids_that_still_exist_are_a_hard_failure():
+    # A page earlier in the corpus gained one chunk: every later id now names the next chunk.
+    shifted = {
+        10: gate.ChunkRow(0, "https://x.test/0", 2),  # belonged to another document
+        11: gate.ChunkRow(1, "https://x.test/1", 0),  # right document, but ord 0 is not 11's
+        20: GOOD_CHUNKS[20],
+    }
+    # ids exist, so none is "missing"; identity is what fails
+    problems = problems_for(shifted)
+    assert len(problems) == 1 and "ids shifted" in problems[0]
+    assert "q000 chunk 10" in problems[0]
+    assert "q000 chunk 11" not in problems[0]  # ord 0 is among q000's held-out ords [0, 1]
+    assert "q001" not in problems[0]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        gate.ChunkRow(9, "https://x.test/1", 0),  # another document id
+        gate.ChunkRow(1, "https://x.test/other", 0),  # same id, URL changed
+        gate.ChunkRow(1, "https://x.test/1", 5),  # position not held out
+    ],
+)
+def test_each_identity_mismatch_alone_is_a_hard_failure(bad):
+    problems = problems_for({**GOOD_CHUNKS, 10: bad})
+    assert len(problems) == 1 and "q000 chunk 10" in problems[0]
 
 
 def test_structural_problems_are_all_reported_together():
-    problems = gate.structural_problems(GOLD, set(), set(), 100, 500, make_baseline())
+    problems = problems_for({}, set(), documents=100, count=500)
     assert len(problems) == 4
 
 
@@ -260,10 +298,10 @@ def test_compare_command_missing_file_is_exit_2(tmp_path, capsys):
 
 
 class FakeDb:
-    """Stands in for `db.connect()` and holds the ids the index contains."""
+    """Stands in for `db.connect()`: the gold chunk ids it holds (id to ChunkRow) and doc ids."""
 
-    def __init__(self, chunk_ids, doc_ids):
-        self.chunk_ids, self.doc_ids = set(chunk_ids), set(doc_ids)
+    def __init__(self, chunks, doc_ids):
+        self.chunks, self.doc_ids = dict(chunks), set(doc_ids)
         self.queries = []
 
     def __enter__(self):
@@ -275,8 +313,12 @@ class FakeDb:
     def execute(self, sql, params=()):
         self.queries.append(sql)
         wanted = set(params[0])
-        pool = self.chunk_ids if "FROM chunks" in sql else self.doc_ids
-        rows = [(i,) for i in sorted(wanted & pool)]
+        if "FROM chunks" in sql:
+            rows = [
+                (i, c.doc_id, c.url, c.ord) for i, c in sorted(self.chunks.items()) if i in wanted
+            ]
+        else:
+            rows = [(i,) for i in sorted(wanted & self.doc_ids)]
         return type("Rows", (), {"fetchall": lambda self_: rows})()
 
 
@@ -295,14 +337,15 @@ def index_command(tmp_path, monkeypatch, db, version="idx1", documents=200, chun
     return [*argv, "--summary-file", str(summary)], summary
 
 
-def test_present_ids_queries_chunks_and_documents():
-    db = FakeDb({10, 11}, {1, 2})
-    assert gate.present_ids(db, {10, 99}, {2, 98}) == ({10}, {2})
-    assert len(db.queries) == 2
+def test_gold_rows_in_index_reads_document_url_and_position():
+    db = FakeDb(GOOD_CHUNKS, {1, 2})
+    rows, docs = gate.gold_rows_in_index(db, {10, 99}, {2, 98})
+    assert rows == {10: GOOD_CHUNKS[10]} and docs == {2}
+    assert len(db.queries) == 2 and "JOIN postmortems" in db.queries[0]
 
 
 def test_index_command_passes_silently_on_the_baseline_version(tmp_path, monkeypatch, capsys):
-    argv, _ = index_command(tmp_path, monkeypatch, FakeDb({10, 11, 20}, {1, 2, 3}))
+    argv, _ = index_command(tmp_path, monkeypatch, FakeDb(GOOD_CHUNKS, GOOD_DOCS))
     assert gate.main(argv) == 0
     out = capsys.readouterr().out
     assert "compatible with the gold set" in out and "WARNING" not in out
@@ -310,7 +353,7 @@ def test_index_command_passes_silently_on_the_baseline_version(tmp_path, monkeyp
 
 def test_index_command_warns_but_passes_on_another_version(tmp_path, monkeypatch, capsys):
     argv, summary = index_command(
-        tmp_path, monkeypatch, FakeDb({10, 11, 20}, {1, 2, 3}), version="idx9"
+        tmp_path, monkeypatch, FakeDb(GOOD_CHUNKS, GOOD_DOCS), version="idx9"
     )
     assert gate.main(argv) == 0
     out = capsys.readouterr().out
@@ -319,7 +362,9 @@ def test_index_command_warns_but_passes_on_another_version(tmp_path, monkeypatch
 
 
 def test_index_command_fails_on_a_missing_gold_chunk(tmp_path, monkeypatch, capsys):
-    argv, summary = index_command(tmp_path, monkeypatch, FakeDb({10, 20}, {1, 2, 3}))
+    argv, summary = index_command(
+        tmp_path, monkeypatch, FakeDb({k: v for k, v in GOOD_CHUNKS.items() if k != 11}, GOOD_DOCS)
+    )
     assert gate.main(argv) == 1
     err = capsys.readouterr().err
     assert "FAIL" in err and "chunk ids missing" in err and "refresh the baseline" in err
@@ -327,13 +372,13 @@ def test_index_command_fails_on_a_missing_gold_chunk(tmp_path, monkeypatch, caps
 
 
 def test_index_command_fails_on_count_drift(tmp_path, monkeypatch, capsys):
-    argv, _ = index_command(tmp_path, monkeypatch, FakeDb({10, 11, 20}, {1, 2, 3}), documents=150)
+    argv, _ = index_command(tmp_path, monkeypatch, FakeDb(GOOD_CHUNKS, GOOD_DOCS), documents=150)
     assert gate.main(argv) == 1
     assert "150 documents but the baseline's has 200" in capsys.readouterr().err
 
 
 def test_index_command_database_down_is_exit_2(tmp_path, monkeypatch, capsys):
-    argv, _ = index_command(tmp_path, monkeypatch, FakeDb(set(), set()))
+    argv, _ = index_command(tmp_path, monkeypatch, FakeDb({}, set()))
 
     def refuse():
         raise psycopg.OperationalError("connection refused")
@@ -341,3 +386,23 @@ def test_index_command_database_down_is_exit_2(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(gate.db, "connect", refuse)
     assert gate.main(argv) == 2
     assert "connection refused" in capsys.readouterr().err
+
+
+def test_index_command_fails_on_shifted_ids_that_still_exist(tmp_path, monkeypatch, capsys):
+    shifted = {**GOOD_CHUNKS, 10: gate.ChunkRow(0, "https://x.test/0", 2)}
+    argv, summary = index_command(tmp_path, monkeypatch, FakeDb(shifted, GOOD_DOCS))
+    assert gate.main(argv) == 1
+    err = capsys.readouterr().err
+    assert "ids shifted" in err and "refresh the baseline" in err
+    assert "ids shifted" in summary.read_text()
+
+
+@pytest.mark.parametrize("missing", ["index_documents", "index_chunks"])
+def test_baseline_without_counts_is_a_clear_error_not_a_traceback(tmp_path, capsys, missing):
+    old = make_baseline()
+    del old[missing]
+    baseline = write(tmp_path, "baseline.json", old)
+    result = write(tmp_path, "result.json", make_result())
+    assert gate.main(["compare", "--baseline", str(baseline), str(result)]) == 2
+    err = capsys.readouterr().err
+    assert missing in err and "Regenerate it" in err and "Traceback" not in err

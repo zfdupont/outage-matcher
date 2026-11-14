@@ -8,8 +8,9 @@ were measured on, and a tolerance. The rule:
 
 1. Hard failure, with the instructions to refresh the baseline, only when the fresh index is
    structurally incompatible with the gold set: a gold held-out chunk id or relevant document id is
-   missing from it, or its document or chunk count is more than 2 percent away from the
-   baseline's.
+   missing from it, a gold chunk id points at another document, URL or position than the gold
+   row's (serial ids shift when a page changes its chunk count), or its document or chunk count is
+   more than 2 percent away from the baseline's.
 2. Otherwise recall@k and MRR are compared with the baseline and the gate fails when any is more
    than the tolerance below its baseline value.
 3. A different index version alone (a page changed a little, for example a view counter) only
@@ -108,23 +109,57 @@ def gold_ids(gold: Sequence[GoldQuery]) -> tuple[set[int], set[int]]:
     return chunk_ids, doc_ids
 
 
+@dataclass(frozen=True)
+class ChunkRow:
+    """Where a gold chunk id points in the index: its document, the document's URL and position."""
+
+    doc_id: int
+    url: str
+    ord: int
+
+
 def structural_problems(
     gold: Sequence[GoldQuery],
-    present_chunk_ids: set[int],
+    chunk_rows: dict[int, ChunkRow],
     present_doc_ids: set[int],
     documents: int,
     chunks: int,
     baseline: dict[str, Any],
 ) -> list[str]:
-    """Why the index cannot be scored with this gold set (empty when it can)."""
+    """Why the index cannot be scored with this gold set (empty when it can).
+
+    Chunk ids are serial numbers, so a page that gains or loses a chunk shifts every later id and
+    an id can exist yet name another chunk. Each gold chunk must therefore belong to the gold
+    row's document (same id and URL) at one of the row's held-out positions.
+    """
     chunk_ids, doc_ids = gold_ids(gold)
     problems = []
-    if chunk_ids - present_chunk_ids:
-        missing = chunk_ids - present_chunk_ids
+    missing = chunk_ids - set(chunk_rows)
+    if missing:
         problems.append(f"gold held-out chunk ids missing from the index: {_listed(missing)}")
-    if doc_ids - present_doc_ids:
-        missing = doc_ids - present_doc_ids
-        problems.append(f"gold relevant document ids missing from the index: {_listed(missing)}")
+    misaligned = []
+    for row in gold:
+        for chunk_id in row.held_out_chunk_ids:
+            found = chunk_rows.get(chunk_id)
+            if found is None:
+                continue  # already reported as missing
+            if (
+                found.doc_id != row.doc_id
+                or found.url != row.doc_url
+                or found.ord not in row.held_out_ords
+            ):
+                misaligned.append(f"{row.id} chunk {chunk_id}")
+    if misaligned:
+        problems.append(
+            "gold held-out chunk ids that now point at another document or position "
+            f"(ids shifted): {', '.join(misaligned[:MAX_LISTED])}"
+            + (f" and {len(misaligned) - MAX_LISTED} more" if len(misaligned) > MAX_LISTED else "")
+        )
+    missing_docs = doc_ids - present_doc_ids
+    if missing_docs:
+        problems.append(
+            f"gold relevant document ids missing from the index: {_listed(missing_docs)}"
+        )
     return problems + count_drift(documents, chunks, baseline)
 
 
@@ -218,6 +253,24 @@ def _append(path: Path | None, text: str) -> None:
             handle.write(text + "\n")
 
 
+REQUIRED_BASELINE_KEYS = ("index_version", "index_documents", "index_chunks", "gold_sha256")
+
+
+def _load_baseline(path: Path) -> dict[str, Any] | None:
+    baseline = _load(path, "baseline")
+    if baseline is None:
+        return None
+    missing = [key for key in REQUIRED_BASELINE_KEYS if key not in baseline]
+    if missing:
+        print(
+            f"error: baseline {path} lacks {', '.join(missing)}; it was written by an older "
+            "version. Regenerate it with `uv run python -m outage_matcher.evals.summary`.",
+            file=sys.stderr,
+        )
+        return None
+    return baseline
+
+
 def _load(path: Path, what: str) -> dict[str, Any] | None:
     try:
         return load_json(path)
@@ -226,21 +279,28 @@ def _load(path: Path, what: str) -> dict[str, Any] | None:
         return None
 
 
-def present_ids(conn: Any, chunk_ids: set[int], doc_ids: set[int]) -> tuple[set[int], set[int]]:
-    """Which of the gold's chunk ids and document ids exist in the index."""
-    chunks = conn.execute("SELECT id FROM chunks WHERE id = ANY(%s)", (sorted(chunk_ids),))
+def gold_rows_in_index(
+    conn: Any, chunk_ids: set[int], doc_ids: set[int]
+) -> tuple[dict[int, ChunkRow], set[int]]:
+    """What the index holds for the gold's chunk ids (document, URL, position) and doc ids."""
+    chunks = conn.execute(
+        "SELECT c.id, c.postmortem_id, p.url, c.ord FROM chunks c "
+        "JOIN postmortems p ON p.id = c.postmortem_id WHERE c.id = ANY(%s)",
+        (sorted(chunk_ids),),
+    )
     docs = conn.execute("SELECT id FROM postmortems WHERE id = ANY(%s)", (sorted(doc_ids),))
-    return {row[0] for row in chunks.fetchall()}, {row[0] for row in docs.fetchall()}
+    rows = {row[0]: ChunkRow(row[1], row[2], row[3]) for row in chunks.fetchall()}
+    return rows, {row[0] for row in docs.fetchall()}
 
 
 def cmd_index(args: argparse.Namespace) -> int:
-    baseline = _load(args.baseline, "baseline")
+    baseline = _load_baseline(args.baseline)
     if baseline is None:
         return 2
     gold = read_gold(args.gold)
     with db.connect() as conn:
         info = corpus_mod.index_info(conn)
-        present = present_ids(conn, *gold_ids(gold))
+        present = gold_rows_in_index(conn, *gold_ids(gold))
     problems = structural_problems(gold, *present, info.documents, info.chunks, baseline)
     if problems:
         message = _structural_error(problems)
@@ -260,7 +320,7 @@ def cmd_index(args: argparse.Namespace) -> int:
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    baseline = _load(args.baseline, "baseline")
+    baseline = _load_baseline(args.baseline)
     result = _load(args.result, "result")
     if baseline is None or result is None:
         return 2
