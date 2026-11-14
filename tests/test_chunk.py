@@ -106,5 +106,44 @@ def test_largest_container_wins_over_small_article_cards():
         f"<h2>Root cause</h2>{body}</main></body></html>"
     )
     chunks = chunk.chunk_html(html)
-    assert chunks and all("stale replica" in c.text for c in chunks)
-    assert chunks[0].section_type == "root_cause"
+    root = [c for c in chunks if c.section_type == "root_cause"]
+    assert root and all("stale replica" in c.text for c in root)
+    assert not any("Related card" in c.text for c in root)
+
+
+def test_short_sections_are_kept_with_their_heading():
+    html = (
+        "<html><body><article><p>" + "Intro about the outage and what broke. " * 4 + "</p>"
+        "<h2>Impact</h2><p>Users saw 5xx for 12 minutes.</p>"
+        "<h2>Fix</h2><p>Rolled back the change.</p></article></body></html>"
+    )
+    by_type = {c.section_type: c.text for c in chunk.chunk_html(html)}
+    assert by_type["impact"] == "Impact\nUsers saw 5xx for 12 minutes."
+    assert by_type["remediation"] == "Fix\nRolled back the change."
+
+
+def test_text_outside_block_tags_is_not_dropped_even_next_to_paragraphs():
+    html = (
+        "<html><body><article>"
+        "<p>" + "A long paragraph describing the first part of the incident. " * 12 + "</p>"
+        "<div>Loose text in a div that says the cache layer was saturated by retries.</div>"
+        "<div>Direct text before a child. <span>inline part stays joined.</span>"
+        "<p>Child paragraph follows.</p>Trailing loose text after the child.</div>"
+        "</article></body></html>"
+    )
+    text = " ".join(c.text for c in chunk.chunk_html(html))
+    assert "cache layer was saturated by retries" in text
+    assert "Direct text before a child. inline part stays joined." in text
+    assert "Child paragraph follows." in text
+    assert "Trailing loose text after the child." in text
+
+
+def test_heading_is_budgeted_into_the_chunk_size_cap():
+    heading = "Root cause analysis of the primary failure"
+    body = " ".join(f"Sentence {i} explains the failure in some detail." for i in range(60))
+    chunks = chunk.chunk_html(
+        f"<html><body><article><h2>{heading}</h2><p>{body}</p></article></body></html>",
+        max_chars=300,
+    )
+    assert len(chunks) > 3
+    assert all(len(c.text) <= 300 and c.text.startswith(heading) for c in chunks)

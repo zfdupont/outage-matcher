@@ -5,14 +5,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 MAX_CHARS = 1000  # about 250 tokens; MiniLM truncates at 256 word pieces
-MIN_BODY_CHARS = 40  # sections with less body text than this are dropped
+MIN_BODY_CHARS = 40  # documents with less body text than this yield no chunks
 
 NOISE_TAGS = ("head", "script", "style", "noscript", "nav", "header", "footer", "aside", "form")
 HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 BLOCK_TAGS = ("p", "li", "pre", "blockquote", "dd", "dt", "td", "th")
+# Tags whose text joins the surrounding run of text instead of starting a new paragraph.
+INLINE_TAGS = frozenset(
+    "a abbr b bdi bdo cite code data del dfn em font i img ins kbd label mark q s samp small "
+    "span strong sub sup time tt u var wbr".split()
+)
 MAIN_SELECTORS = (
     "article",
     "main",
@@ -23,8 +28,6 @@ MAIN_SELECTORS = (
     ".post-body",
     "#content",
 )
-
-SECTION_TYPES = ("summary", "timeline", "root_cause", "impact", "remediation", "other")
 
 # Order matters: the first matching rule wins.
 SECTION_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -82,15 +85,6 @@ def _find_main(soup: BeautifulSoup) -> Tag:
     return soup.body or soup
 
 
-def _has_block_ancestor(node: Tag, root: Tag) -> bool:
-    for parent in node.parents:
-        if parent is root:
-            return False
-        if parent.name in BLOCK_TAGS:
-            return True
-    return False
-
-
 def _is_pseudo_heading(node: Tag, text: str) -> bool:
     """A short paragraph that is entirely bold, like <p><strong>Timeline</strong></p>."""
     if node.name != "p" or len(text) > 80 or text.endswith((".", ",", ";")):
@@ -99,46 +93,82 @@ def _is_pseudo_heading(node: Tag, text: str) -> bool:
     return bold is not None and _clean(bold.get_text(" ")) == text
 
 
+class _SectionBuilder:
+    """Walks the DOM in order. Block tags are paragraphs, containers are recursed into, and
+    loose text between them (including <br> separated lines) becomes its own paragraphs."""
+
+    def __init__(self) -> None:
+        self.sections: list[Section] = []
+        self.current = Section(heading="", section_type="summary")
+        self.saw_heading = False
+        self._run: list[str] = []
+
+    def _flush_run(self) -> None:
+        text = _clean(" ".join(self._run))
+        self._run = []
+        if text:
+            self.current.paragraphs.append(text)
+
+    def _start_section(self, heading: str, from_h1: bool) -> None:
+        self.sections.append(self.current)
+        section_type = classify_heading(heading)
+        if from_h1 and not self.saw_heading and section_type == "other":
+            section_type = "summary"  # the title heading introduces the document
+        self.current = Section(heading=heading, section_type=section_type)
+        self.saw_heading = True
+
+    def walk(self, node: Tag) -> None:
+        for child in node.children:
+            if isinstance(child, Tag):
+                self._visit(child)
+            elif isinstance(child, NavigableString) and not isinstance(child, Comment):
+                self._run.append(str(child))
+
+    def _visit(self, tag: Tag) -> None:
+        if tag.name == "br":
+            self._flush_run()
+        elif tag.name in HEADING_TAGS:
+            self._flush_run()
+            text = _clean(tag.get_text(" "))
+            if text:
+                self._start_section(text, from_h1=tag.name == "h1")
+        elif tag.name in BLOCK_TAGS:
+            self._flush_run()
+            text = _clean(tag.get_text(" "))
+            if not text:
+                return
+            if _is_pseudo_heading(tag, text):
+                self._start_section(text, from_h1=False)
+            else:
+                self.current.paragraphs.append(text)
+        elif tag.name in INLINE_TAGS and not tag.find(HEADING_TAGS + BLOCK_TAGS):
+            self._run.append(tag.get_text(" "))
+        else:
+            self._flush_run()
+            self.walk(tag)
+            self._flush_run()
+
+    def finish(self) -> list[Section]:
+        self._flush_run()
+        self.sections.append(self.current)
+        if not self.saw_heading:
+            for section in self.sections:
+                section.section_type = "other"
+        return [s for s in self.sections if s.paragraphs]
+
+
 def extract_sections(html: str) -> list[Section]:
-    """Walk the main content in document order and group paragraphs under headings."""
+    """Group the main content's text under its headings, keeping every non-empty section."""
     soup = BeautifulSoup(html, "lxml")
     main = _find_main(soup)
     for tag in main(NOISE_TAGS):
         tag.decompose()
-
-    sections: list[Section] = []
-    current = Section(heading="", section_type="summary")
-    saw_heading = False
-    block_chars = 0
-    for node in main.find_all(HEADING_TAGS + BLOCK_TAGS):
-        if node.name not in HEADING_TAGS and _has_block_ancestor(node, main):
-            continue
-        text = _clean(node.get_text(" "))
-        if not text:
-            continue
-        if node.name in HEADING_TAGS or _is_pseudo_heading(node, text):
-            sections.append(current)
-            section_type = classify_heading(text)
-            if node.name == "h1" and not saw_heading and section_type == "other":
-                section_type = "summary"  # the title heading introduces the document
-            current = Section(heading=text, section_type=section_type)
-            saw_heading = True
-        else:
-            current.paragraphs.append(text)
-            block_chars += len(text)
-    sections.append(current)
-
-    full_text_chars = len(_clean(main.get_text(" ")))
-    if block_chars < 0.5 * full_text_chars:
-        # Text is not wrapped in block tags (for example <br> separated); use raw lines.
-        lines = [_clean(line) for line in main.get_text("\n").splitlines()]
-        sections = [Section("", "other", [line for line in lines if line])]
-        saw_heading = False
-
-    if not saw_heading:
-        for section in sections:
-            section.section_type = "other"
-    return [s for s in sections if sum(len(p) for p in s.paragraphs) >= MIN_BODY_CHARS]
+    builder = _SectionBuilder()
+    builder.walk(main)
+    sections = builder.finish()
+    if sum(len(p) for s in sections for p in s.paragraphs) < MIN_BODY_CHARS:
+        return []
+    return sections
 
 
 def _split_long(text: str, limit: int) -> list[str]:
@@ -184,9 +214,13 @@ def _pack(paragraphs: list[str], limit: int) -> list[str]:
 def chunk_sections(sections: list[Section], max_chars: int = MAX_CHARS) -> list[Chunk]:
     chunks: list[Chunk] = []
     for section in sections:
-        for body in _pack(section.paragraphs, max_chars):
-            text = f"{section.heading}\n{body}" if section.heading else body
-            chunks.append(Chunk(ord=len(chunks), section_type=section.section_type, text=text))
+        # The heading is prepended to every chunk, so budget for it to keep chunks under the cap.
+        prefix = f"{section.heading}\n" if section.heading else ""
+        body_limit = max(max_chars - len(prefix), max_chars // 2)
+        for body in _pack(section.paragraphs, body_limit):
+            chunks.append(
+                Chunk(ord=len(chunks), section_type=section.section_type, text=prefix + body)
+            )
     return chunks
 
 
