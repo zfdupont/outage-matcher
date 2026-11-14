@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.*
+.env.local
+!.env.example
+
+# Dependencies
+node_modules/
+vendor/
+__pycache__/
+.venv/
+
+# Build outputs
+dist/
+build/
+.next/
+*.pyc
+*.egg-info/
+
+# Claude local files
+.claude/settings.local.json
+CLAUDE.local.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data (raw crawls and local indexes are regenerated)
+data/raw/
+data/chroma/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
