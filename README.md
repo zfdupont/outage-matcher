@@ -101,7 +101,23 @@ Baseline: **bge, section chunking** (highest MRR of the models above).
 | bge, neighbor chunking | 0.412 | 0.559 | 0.618 | 0.706 | 0.515 | -0.005 | 6 / 15 / 13 |
 | bge, section chunking, rerank Xenova/ms-marco-MiniLM-L-6-v2 (top 50) | 0.588 | 0.676 | 0.735 | 0.765 | 0.646 | +0.127 | 10 / 5 / 19 |
 
-Faithfulness has not been run yet, so no faithfulness number is claimed.
+### Faithfulness (LLM judge)
+
+- Agent: claude-haiku-5-5 (Anthropic). Judge: deepseek-flash (DeepSeek, a different model family), temperature 0.0. Run on 2026-11-13.
+- Queries: 34; judged answers: 19; abstained (no close match): 15; errors: 0.
+- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 11 of 15.
+- Claims supported by the cited chunks: 147 of 219 (0.671).
+- Answers with every claim supported: 0.000.
+- Tokens: agent 389307 in / 35072 out, judge 13865 in / 11534 out.
+
+Reading these numbers: faithfulness here means each claim is supported by the chunks the answer
+cites; it is not correctness against the held-out root cause. The judge is strict, so generic advice
+that no excerpt mentions counts as unsupported, which is why no answer has every claim supported.
+Most abstentions are not retrieval misses: the model cited excerpt numbers instead of document ids,
+the citation check dropped them, and the agent returned "no close match" (see
+`docs/examples/db-failover-split-brain.md`). The scored answers are the 19 that kept a valid
+citation, so the rates above describe that subset only. The agent is nondeterministic and the
+figures come from one run.
 
 ### Limitations
 
@@ -114,4 +130,4 @@ Faithfulness has not been run yet, so no faithfulness number is claimed.
   figures are optimistic by an unknown amount.
 - Only chunks classified as `root_cause` are held out. Other sections can still describe the cause, and
   suggested near-duplicate documents are not confirmed, so they do not count as relevant.
-- The faithfulness judge uses the same configurable model (`DEEPSEEK_MODEL`, default `deepseek-flash`); the exact id will be recorded in the faithfulness result file when that run happens.
+- The faithfulness judge is `deepseek-flash` (id recorded in `evals/results/faithfulness.json`), the same model family that wrote the gold queries, with `thinking` disabled and temperature 0. It is a different family from the Anthropic agent, but a model judging claims is still an imperfect measure.

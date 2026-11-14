@@ -197,6 +197,9 @@ def test_run_all_records_per_query_outcomes_and_the_source_citation():
     assert first["agent_usage"] == {"input_tokens": 100, "output_tokens": 20, "llm_calls": 3}
     assert first["judge_usage"]["input_tokens"] == 50 and len(first["claims"]) == 1
     assert second["no_match"] is True and second["claims"] == []
+    assert first["answer_notes"] == [] and first["graded_relevant"] == 0
+    assert first["retrieved_doc_ids"] == [1, 2]
+    assert first["judge_evidence_chars"] == len("A config push broke it.")
     assert run_faithfulness.sum_usage(records, "agent_usage")["calls"] == 6
 
 

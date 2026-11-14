@@ -65,6 +65,9 @@ def evaluate_query(row: GoldQuery, agent: Any, judge: DeepSeekClient) -> dict[st
         "cited_doc_ids": [c.doc_id for c in answer.citations],
         "cited_source_doc": row.doc_id in {c.doc_id for c in answer.citations},
         "retries": result.retries,
+        "answer_notes": answer.notes,  # why a citation was dropped or the answer abstained
+        "graded_relevant": sum(e["relevant"] for e in result.events if e["type"] == "grade"),
+        "retrieved_doc_ids": sorted({c.doc_id for c in result.evidence}),
         "agent_usage": asdict(result.usage),
         "claims": [],
         "judge_usage": None,
@@ -73,6 +76,7 @@ def evaluate_query(row: GoldQuery, agent: Any, judge: DeepSeekClient) -> dict[st
     if answer.no_match:
         return record
     judgment = faithfulness.judge_answer(judge, result)
+    record["judge_evidence_chars"] = sum(len(c.text) for c in faithfulness.cited_evidence(result))
     record["claims"] = [asdict(c) for c in judgment.claims]
     record["judge_usage"] = asdict(judgment.usage)
     return record

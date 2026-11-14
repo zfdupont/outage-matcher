@@ -165,6 +165,11 @@ def _render_faithfulness(data: dict[str, Any]) -> list[str]:
     m, cfg, tokens = data["metrics"], data["config"], data["tokens"]
     rate = m["claim_support_rate"]
     faithful = m["faithful_answer_rate"]
+    dropped = sum(
+        1
+        for q in data["per_query"]
+        if q.get("no_match") and any("dropped citation" in n for n in q.get("answer_notes", []))
+    )
     return [
         "",
         "## Faithfulness (LLM judge)",
@@ -173,6 +178,8 @@ def _render_faithfulness(data: dict[str, Any]) -> list[str]:
         f"different model family), temperature {cfg['judge_temperature']}. Run on {data['date']}.",
         f"- Queries: {m['queries']}; judged answers: {m['answered_and_judged']}; abstained "
         f"(no close match): {m['no_match']}; errors: {m['errors']}.",
+        f"- Abstentions where every citation named a document that was not retrieved (the "
+        f"citation check dropped it): {dropped} of {m['no_match']}.",
         f"- Claims supported by the cited chunks: {m['claims_supported']} of {m['claims']} "
         f"({'n/a' if rate is None else f'{rate:.3f}'}).",
         "- Answers with every claim supported: "

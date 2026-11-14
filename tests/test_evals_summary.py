@@ -53,6 +53,17 @@ FAITHFULNESS = {
         "claim_support_rate": 0.75,
         "faithful_answer_rate": 2 / 3,
     },
+    "per_query": [
+        {
+            "no_match": True,
+            "answer_notes": ["dropped citation of a document that was not retrieved: 0"],
+        },
+        {
+            "no_match": False,
+            "answer_notes": ["dropped citation of a document that was not retrieved: 3"],
+        },
+        {"no_match": False, "answer_notes": []},
+    ],
     "tokens": {
         "agent": {"input_tokens": 1000, "output_tokens": 100, "calls": 9},
         "judge": {"input_tokens": 500, "output_tokens": 50, "calls": 3},
@@ -95,6 +106,7 @@ def test_summary_tables_copy_the_recorded_numbers(results):
     assert "Baseline: **bge, section chunking**" in text
     assert "6 of 8" in text and "0.750" in text and "0.667" in text
     assert "deepseek-flash (DeepSeek, a different model family)" in text
+    assert "citation check dropped it): 1 of 1" in text
     assert "synthetic" in text
 
 

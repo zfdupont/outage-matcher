@@ -23,3 +23,12 @@ Baseline: **bge, section chunking** (highest MRR of the models above).
 | bge, section chunking | 0.412 | 0.588 | 0.647 | 0.735 | 0.519 | baseline | - |
 | bge, neighbor chunking | 0.412 | 0.559 | 0.618 | 0.706 | 0.515 | -0.005 | 6 / 15 / 13 |
 | bge, section chunking, rerank Xenova/ms-marco-MiniLM-L-6-v2 (top 50) | 0.588 | 0.676 | 0.735 | 0.765 | 0.646 | +0.127 | 10 / 5 / 19 |
+
+## Faithfulness (LLM judge)
+
+- Agent: claude-haiku-5-5 (Anthropic). Judge: deepseek-flash (DeepSeek, a different model family), temperature 0.0. Run on 2026-11-13.
+- Queries: 34; judged answers: 19; abstained (no close match): 15; errors: 0.
+- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 11 of 15.
+- Claims supported by the cited chunks: 147 of 219 (0.671).
+- Answers with every claim supported: 0.000.
+- Tokens: agent 389307 in / 35072 out, judge 13865 in / 11534 out.
