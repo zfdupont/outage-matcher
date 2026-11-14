@@ -151,6 +151,7 @@ Markdown transcript (see `docs/examples/`).
     uv run python evals/run_retrieval.py --model bge          # also --chunking neighbor, --reranker
     uv run python evals/run_faithfulness.py                   # needs ANTHROPIC_API_KEY and DEEPSEEK_API_KEY
     uv run python -m outage_matcher.evals.summary             # evals/results/summary.md, evals/baseline.json
+    uv run python -m outage_matcher.evals.charts              # docs/img/*.png, the Results figures
 
 - Gold set (`evals/gold.jsonl`): for each postmortem with a clear root-cause section, that section is
   held out (its chunks are excluded from retrieval for that query) and a DeepSeek model writes a
@@ -176,6 +177,8 @@ Markdown transcript (see `docs/examples/`).
 Copied from `evals/results/summary.md`. Gold set: 34 synthetic queries, one index (235 documents, 4482
 chunks). Rank is the position of the source document among distinct documents.
 
+The figures are drawn from the same result files by `uv run python -m outage_matcher.evals.charts`.
+
 ### Embedding models (section chunking)
 
 | Model | recall@1 | recall@3 | recall@5 | recall@10 | MRR |
@@ -192,6 +195,14 @@ Baseline: **bge, section chunking** (highest MRR of the models above).
 | bge, section chunking | 0.412 | 0.588 | 0.647 | 0.735 | 0.519 | baseline | - |
 | bge, neighbor chunking | 0.412 | 0.559 | 0.618 | 0.706 | 0.515 | -0.005 | 6 / 15 / 13 |
 | bge, section chunking, rerank Xenova/ms-marco-MiniLM-L-6-v2 (top 50) | 0.588 | 0.676 | 0.735 | 0.765 | 0.646 | +0.127 | 10 / 5 / 19 |
+
+![Grouped bars of recall@k and MRR for the four retrieval configurations](docs/img/retrieval-metrics.png)
+
+Figure: the retrieval metrics of the two tables above, one bar per configuration.
+
+![Paired dot plot of the source document's rank per gold query, baseline and reranked](docs/img/rank-change-rerank.png)
+
+Figure: rank of the source document for each gold query, baseline against reranked. Ranks beyond 10 share one bin, so moves inside it (counted in the better / worse / same column above) do not show.
 
 ### Faithfulness (LLM judge)
 
@@ -211,6 +222,10 @@ Every row is one run on the same gold set, index and judge; the agent is nondete
 | before the fix, first run (2026-11-13) | 15 of 34 | 19 | 125 of 183 | 0.683 | 0.067 |
 | before the fix, second run (2026-11-13) | 19 of 34 | 15 | 147 of 219 | 0.671 | 0.000 |
 | after the fix (2026-11-13) | 27 of 34 | 7 | 239 of 336 | 0.711 | 0.037 |
+
+![Judged and abstained answers and claim support rate for each faithfulness run](docs/img/faithfulness-before-after.png)
+
+Figure: judged and abstained answers and the claim support rate for the runs in the table above; each bar is a single run of a nondeterministic agent, and the rates cover judged answers only.
 
 The answered sets differ in size (15, 19, 27 answers), and abstentions are excluded from the rates, so the rates are not like-for-like.
 
