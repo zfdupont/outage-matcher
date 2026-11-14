@@ -5,32 +5,32 @@
     "minilm": "sentence-transformers/all-MiniLM-L6-v2"
   },
   "document_count": 235,
-  "chunk_count": 4092,
+  "chunk_count": 4482,
   "per_source": {
     "cloudflare": {
       "documents": 29,
-      "chunks": 563
+      "chunks": 584
     },
     "community": {
       "documents": 103,
-      "chunks": 1729
+      "chunks": 1896
     },
     "gcp": {
       "documents": 22,
-      "chunks": 843
+      "chunks": 866
     },
     "github": {
       "documents": 81,
-      "chunks": 957
+      "chunks": 1136
     }
   },
   "chunks_per_section_type": {
-    "impact": 404,
-    "other": 2141,
-    "remediation": 196,
-    "root_cause": 122,
-    "summary": 1110,
-    "timeline": 119
+    "impact": 756,
+    "other": 2422,
+    "remediation": 212,
+    "root_cause": 133,
+    "summary": 838,
+    "timeline": 121
   },
   "documents_per_system_type": {
     "compute": 44,

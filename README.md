@@ -33,9 +33,9 @@ Raw pages stay local under `data/raw/` (git-ignored); the committed `data/manife
 
 Numbers below are copied from `data/corpus_stats.json` (generated 2026-11-13).
 
-- Documents: 235. Chunks: 4092.
-- Per source (documents / chunks): cloudflare 29 / 563, community 103 / 1729, gcp 22 / 843, github 81 / 957.
+- Documents: 235. Chunks: 4482.
+- Per source (documents / chunks): cloudflare 29 / 584, community 103 / 1896, gcp 22 / 866, github 81 / 1136.
 - Candidate pages that were not stored: 99 at collection (49 denied hosts, 21 too little text, 17 page-level robots meta, 4 robots.txt, 4 HTTP 404, 2 HTTP 403, 1 robots.txt fetch failed, 1 too large) and 1 with no extractable chunks.
-- Chunks by section type: impact 404, other 2141, remediation 196, root_cause 122, summary 1110, timeline 119.
+- Chunks by section type: impact 756, other 2422, remediation 212, root_cause 133, summary 838, timeline 121.
 
 The qualitative comparison of the two embedding models on five hand-written queries is in `docs/embedding-comparison-m1.md`. Quantitative retrieval results come in a later milestone.
