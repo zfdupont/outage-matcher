@@ -12,7 +12,7 @@ from pathlib import Path
 import psycopg
 from dotenv import load_dotenv
 
-from outage_matcher import db
+from outage_matcher import db, observability
 from outage_matcher.config import load_config
 from outage_matcher.ingest import collect as collect_mod
 from outage_matcher.ingest import index as index_mod
@@ -110,6 +110,8 @@ def cmd_ask(args: argparse.Namespace) -> int:
     except anthropic.APIError as exc:  # network, auth, rate limit or bad model name
         _log(f"error: Anthropic API call failed: {exc}")
         return 1
+    finally:
+        observability.flush()
     print(transcript.render_answer(result))
     print(transcript.render_usage(result))
     if args.transcript:

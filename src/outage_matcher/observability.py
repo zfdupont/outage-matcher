@@ -1,10 +1,11 @@
 """Langfuse tracing that is a no-op unless credentials are configured.
 
 `get_tracer()` returns a Langfuse LangChain/LangGraph callback handler (pass it in
-`config={"callbacks": [tracer]}`) when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set,
-and None otherwise. `trace_span` is a decorator that records a span around a function when
-tracing is on and calls the function unchanged when it is off. Credentials are read from the
-process environment only; `LANGFUSE_HOST` is read by the Langfuse client itself.
+`config={"callbacks": [tracer]}`) when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set
+(not empty, and not the `your-...` placeholders of `.env.example`), and None otherwise.
+`trace_span` is a decorator that records a span around a function when tracing is on and calls
+the function unchanged when it is off. Credentials are read from the process environment only;
+`LANGFUSE_HOST` is read by the Langfuse client itself.
 """
 
 from __future__ import annotations
@@ -19,8 +20,14 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _real_key(name: str) -> bool:
+    """Set to something other than empty or the `your-...` placeholder from `.env.example`."""
+    value = (os.environ.get(name) or "").strip()
+    return bool(value) and not value.startswith("your-")
+
+
 def tracing_enabled() -> bool:
-    return bool(os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"))
+    return _real_key("LANGFUSE_PUBLIC_KEY") and _real_key("LANGFUSE_SECRET_KEY")
 
 
 def get_tracer() -> Any | None:
@@ -33,6 +40,18 @@ def get_tracer() -> Any | None:
         logger.warning("Langfuse keys are set but the langchain integration is unavailable")
         return None
     return CallbackHandler()
+
+
+def flush() -> None:
+    """Send buffered traces now (short-lived processes); a no-op when tracing is off."""
+    if not tracing_enabled():
+        return
+    try:
+        from langfuse import get_client
+
+        get_client().flush()
+    except Exception:  # tracing must never break a request
+        logger.warning("could not flush Langfuse traces", exc_info=True)
 
 
 def trace_span(name_or_func: str | Callable[..., Any] | None = None) -> Any:
