@@ -10,6 +10,9 @@ from pgvector import Vector
 from outage_matcher.db import EMBEDDING_COLUMNS
 from outage_matcher.ingest.embed import Embedder, get_embedder
 
+MAX_K = 1000  # pgvector caps hnsw.ef_search at 1000
+DEFAULT_EF_SEARCH = 40
+
 
 @dataclass(frozen=True)
 class SearchHit:
@@ -33,8 +36,8 @@ def search(
     """Top-k chunks by cosine similarity for one model, optionally within one system type."""
     if model not in EMBEDDING_COLUMNS:
         raise ValueError(f"unknown model {model!r}; choose from {sorted(EMBEDDING_COLUMNS)}")
-    if k < 1:
-        raise ValueError("k must be at least 1")
+    if not 1 <= k <= MAX_K:
+        raise ValueError(f"k must be between 1 and {MAX_K}")
     column = EMBEDDING_COLUMNS[model]
     vector = Vector((embedder or get_embedder(model)).embed_query(query))
     where = "WHERE p.system_type = %s" if system_type else ""
@@ -42,10 +45,17 @@ def search(
     if system_type:
         params.append(system_type)
     params += [vector, k]
-    rows = conn.execute(
-        f"SELECT p.title, c.section_type, 1 - (c.{column} <=> %s) AS score, p.url, "
-        f"p.system_type, c.text FROM chunks c JOIN postmortems p ON p.id = c.postmortem_id "
-        f"{where} ORDER BY c.{column} <=> %s LIMIT %s",
-        params,
-    ).fetchall()
-    return [SearchHit(*row) for row in rows]
+    with conn.transaction():
+        # The HNSW scan returns at most ef_search candidates, so raise it to cover k. With a
+        # filter, the iterative scan keeps scanning until enough matching rows are found.
+        conn.execute(f"SET LOCAL hnsw.ef_search = {max(k, DEFAULT_EF_SEARCH)}")
+        if system_type:
+            conn.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
+        rows = conn.execute(
+            f"SELECT p.title, c.section_type, 1 - (c.{column} <=> %s) AS score, p.url, "
+            f"p.system_type, c.text FROM chunks c JOIN postmortems p ON p.id = c.postmortem_id "
+            f"{where} ORDER BY c.{column} <=> %s LIMIT %s",
+            params,
+        ).fetchall()
+    hits = [SearchHit(*row) for row in rows]
+    return sorted(hits, key=lambda hit: hit.score, reverse=True)  # relaxed scans can be off
