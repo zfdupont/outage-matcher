@@ -2,7 +2,7 @@
 
 RAG agent that takes a description of an incident, finds similar past outages from public postmortems, and returns a likely cause and fix with citations.
 
-Status: M1 (ingest and index) is built. Results are added from measured runs only.
+Status: M1 (ingest and index) and M2 (agent) are built. Results are added from measured runs only.
 
 ## Setup
 
@@ -39,3 +39,16 @@ Numbers below are copied from `data/corpus_stats.json` (generated 2026-11-13).
 - Chunks by section type: impact 756, other 2422, remediation 212, root_cause 133, summary 838, timeline 121.
 
 The qualitative comparison of the two embedding models on five hand-written queries is in `docs/embedding-comparison-m1.md`. Quantitative retrieval results come in a later milestone.
+
+## Agent (M2)
+
+    uv run outage-matcher ask "checkout latency spiked after a config push to our load balancers"
+
+Needs a real `ANTHROPIC_API_KEY` and a loaded index. A LangGraph graph runs `retrieve` (the model calls
+`search_incidents`, `get_postmortem` and `filter_by_system_type` through Anthropic tool use), `grade`
+(the model marks each retrieved chunk relevant or not), then either `rewrite` (new query, retry counter
+plus one, capped by `AGENT_MAX_RETRIES`, default 2) or `answer`. The answer gives a likely cause, a
+suggested fix and citations; a citation of a document that was not retrieved is dropped, and with no
+relevant retrieval after the cap the agent says there is no close match. The model defaults to
+`claude-haiku-5-5` (`AGENT_MODEL` overrides). Each run prints token usage; `--transcript PATH` saves a
+Markdown transcript (see `docs/examples/`). No quality numbers are claimed until the M3 evals run.

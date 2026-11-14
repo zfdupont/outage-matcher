@@ -22,6 +22,7 @@ class SearchHit:
     url: str
     system_type: str
     text: str
+    postmortem_id: int = 0  # postmortems.id, the doc id used for citations
 
 
 def search(
@@ -53,7 +54,8 @@ def search(
             conn.execute("SET LOCAL hnsw.iterative_scan = relaxed_order")
         rows = conn.execute(
             f"SELECT p.title, c.section_type, 1 - (c.{column} <=> %s) AS score, p.url, "
-            f"p.system_type, c.text FROM chunks c JOIN postmortems p ON p.id = c.postmortem_id "
+            f"p.system_type, c.text, p.id FROM chunks c "
+            f"JOIN postmortems p ON p.id = c.postmortem_id "
             f"{where} ORDER BY c.{column} <=> %s LIMIT %s",
             params,
         ).fetchall()
