@@ -240,3 +240,13 @@ def test_refreshed_recomputes_title_from_raw(tmp_path):
 def test_title_dashes_are_normalized():
     html = "<html><head><title>Outage \u2013 post\u2014mortem</title></head><body></body></html>"
     assert collect.html_title(html) == "Outage - post - mortem"
+
+
+def test_title_emoji_and_symbols_are_stripped():
+    html = (
+        "<html><head><title>We deleted the database \U0001f4a5</title></head><body></body></html>"
+    )
+    assert collect.html_title(html) == "We deleted the database"
+    family = "<title>Outage \U0001f468\u200d\U0001f469 \u2764\ufe0f report</title>"
+    assert collect.html_title(f"<html><head>{family}</head></html>") == "Outage report"
+    assert collect.html_title("<title>It\u2019s down</title>") == "It\u2019s down"

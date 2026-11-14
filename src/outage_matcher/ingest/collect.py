@@ -12,6 +12,7 @@ import json
 import random
 import re
 import time
+import unicodedata
 import warnings
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, replace
@@ -214,6 +215,19 @@ def extract_links(html: str, base: str, pattern: str) -> list[str]:
     return list(seen)
 
 
+def normalize_title(title: str) -> str:
+    """Stored titles use plain dashes and no emoji or pictographic symbols."""
+    title = re.sub(r"\s*[\u2013\u2014]\s*", " - ", title)
+    title = "".join(
+        ch
+        for ch in title
+        if unicodedata.category(ch) not in {"So", "Cs"}
+        and ch not in "\ufe0f\u200d"
+        and not 0x1F3FB <= ord(ch) <= 0x1F3FF  # emoji skin tone modifiers
+    )
+    return re.sub(r"\s+", " ", title).strip()
+
+
 GENERIC_TITLE = re.compile(r"^(incident details|google cloud status dashboard)\b", re.I)
 
 
@@ -232,7 +246,7 @@ def html_title(html: str) -> str:
         title = re.sub(r"\s+", " ", text or "").strip()
         if title:
             break
-    title = re.sub(r"\s*[\u2013\u2014]\s*", " - ", title)  # keep stored titles ASCII-dash only
+    title = normalize_title(title)
     if GENERIC_TITLE.match(title):
         # Google Cloud incident pages share one page title; use the incident heading instead.
         headings = [
