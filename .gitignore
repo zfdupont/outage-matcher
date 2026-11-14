@@ -36,3 +36,6 @@ data/chroma/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# Eval caches (embedding matrices, regenerated)
+evals/cache/
