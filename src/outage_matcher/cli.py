@@ -65,9 +65,11 @@ def cmd_search(args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
+    from dotenv import load_dotenv
 
     from outage_matcher.api.app import create_app
 
+    load_dotenv()  # Langfuse keys come from .env in local runs
     uvicorn.run(create_app(), host=args.host, port=args.port)
     return 0
 
