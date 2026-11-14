@@ -16,11 +16,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from outage_matcher.evals.faithfulness import (
+    abstained_after_dropped_citation,
+    abstained_with_relevant_chunks,
+)
 from outage_matcher.evals.metrics import KS
 from outage_matcher.evals.run_faithfulness import OUT_NAME as FAITHFULNESS_FILE
 from outage_matcher.evals.run_retrieval import RESULTS_DIR
 
-EARLIER_FAITHFULNESS_FILE = "faithfulness-prefix-bug.json"  # run before the answer-prompt fix
+# Both runs made with the answer prompt that listed excerpts as `[0] doc_id=...`, oldest first.
+EARLIER_FAITHFULNESS_FILES = (
+    "faithfulness-prefix-bug-first-run.json",
+    "faithfulness-prefix-bug.json",
+)
 SUMMARY_PATH = RESULTS_DIR / "summary.md"
 BASELINE_PATH = Path("evals/baseline.json")
 DEFAULT_TOLERANCE = 0.05  # about one gold query of recall@k (1 query = 1/34)
@@ -57,20 +65,20 @@ def load_runs(results_dir: Path) -> tuple[list[Run], dict[str, Any] | None]:
     return runs, json.loads(faithfulness.read_text()) if faithfulness.exists() else None
 
 
-def load_earlier_faithfulness(results_dir: Path) -> dict[str, Any] | None:
-    path = results_dir / EARLIER_FAITHFULNESS_FILE
-    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+def load_earlier_faithfulness(results_dir: Path) -> list[dict[str, Any]]:
+    """The recorded runs made before the answer-prompt fix that exist in `results_dir`."""
+    paths = [results_dir / name for name in EARLIER_FAITHFULNESS_FILES]
+    return [json.loads(p.read_text(encoding="utf-8")) for p in paths if p.exists()]
 
 
 def check_comparable(
     runs: list[Run],
     faithfulness: dict[str, Any] | None = None,
-    earlier: dict[str, Any] | None = None,
+    earlier: Sequence[dict[str, Any]] = (),
 ) -> None:
     """Results are only reported together when they scored the same gold set on the same index.
     The faithfulness result counts too: it must match the retrieval runs."""
-    extra = [d for d in (faithfulness, earlier) if d is not None]
-    documents = [r.data for r in runs] + extra
+    documents = [r.data for r in runs] + [d for d in (faithfulness, *earlier) if d is not None]
     gold = {d["gold"]["sha256"] for d in documents}
     index = {d["index"]["version"] for d in documents}
     if len(gold) > 1 or len(index) > 1:
@@ -120,7 +128,7 @@ def _header(first: str, extra: Sequence[str] = ()) -> list[str]:
 def render_summary(
     runs: list[Run],
     faithfulness: dict[str, Any] | None,
-    earlier: dict[str, Any] | None = None,
+    earlier: Sequence[dict[str, Any]] = (),
 ) -> str:
     check_comparable(runs, faithfulness, earlier)
     baseline = pick_baseline(runs)
@@ -172,68 +180,117 @@ def render_summary(
         lines.append(f"| {config_label(run)} | {_metric_cells(run.metrics)} | {extra} |")
     if faithfulness is not None:
         lines += _render_faithfulness(faithfulness)
-        if earlier is not None:
-            lines += _render_earlier(faithfulness, earlier)
+        if earlier:
+            lines += _render_earlier(faithfulness, list(earlier))
     lines.append("")
     return "\n".join(lines)
 
 
+def _fmt(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.3f}"
+
+
+def _abstention_breakdown(per_query: list[dict[str, Any]]) -> tuple[int, list[str], int]:
+    """Abstentions split into: dropped citation, relevant chunks but no valid citation (ids),
+    and no relevant retrieval."""
+    abstained = [q for q in per_query if q.get("no_match")]
+    dropped = sum(1 for q in abstained if abstained_after_dropped_citation(q))
+    unexplained = [q["id"] for q in abstained if abstained_with_relevant_chunks(q)]
+    return dropped, unexplained, len(abstained) - dropped - len(unexplained)
+
+
 def _render_faithfulness(data: dict[str, Any]) -> list[str]:
     m, cfg, tokens = data["metrics"], data["config"], data["tokens"]
-    rate = m["claim_support_rate"]
-    faithful = m["faithful_answer_rate"]
-    dropped = sum(
-        1
-        for q in data["per_query"]
-        if q.get("no_match") and any("dropped citation" in n for n in q.get("answer_notes", []))
-    )
-    return [
+    dropped, unexplained, none_relevant = _abstention_breakdown(data["per_query"])
+    thinking = cfg.get("judge_thinking")
+    lines = [
         "",
         "## Faithfulness (LLM judge)",
         "",
         f"- Agent: {cfg['agent_model']} (Anthropic). Judge: {cfg['judge_model']} (DeepSeek, a "
-        f"different model family), temperature {cfg['judge_temperature']}. Run on {data['date']}.",
+        f"different model family), temperature {cfg['judge_temperature']}"
+        + (f", thinking {thinking}" if thinking else "")
+        + f". Run on {data['date']}. A single run of a nondeterministic agent.",
         f"- Queries: {m['queries']}; judged answers: {m['answered_and_judged']}; abstained "
-        f"(no close match): {m['no_match']}; errors: {m['errors']}.",
-        f"- Abstentions where every citation named a document that was not retrieved (the "
-        f"citation check dropped it): {dropped} of {m['no_match']}.",
+        f"(no close match): {m['no_match']}; errors: {m['errors']}. The rates below cover only "
+        f"the {m['answered_and_judged']} judged answers; abstentions are not scored.",
+        f"- Abstentions: {dropped} of {dropped + len(unexplained) + none_relevant} followed "
+        f"citations that were all dropped by the citation check (a cited document that was not "
+        f"retrieved); {len(unexplained)} "
+        f"had relevant chunks but no valid citation or text ({', '.join(unexplained) or 'none'}), "
+        f"cause not explained; {none_relevant} had no relevant retrieval.",
         f"- Claims supported by the cited chunks: {m['claims_supported']} of {m['claims']} "
-        f"({'n/a' if rate is None else f'{rate:.3f}'}).",
-        "- Answers with every claim supported: "
-        f"{'n/a' if faithful is None else f'{faithful:.3f}'}.",
+        f"({_fmt(m['claim_support_rate'])}).",
+        f"- Answers with every claim supported: {_fmt(m['faithful_answer_rate'])}.",
         f"- Tokens: agent {tokens['agent']['input_tokens']} in / "
         f"{tokens['agent']['output_tokens']} out, judge {tokens['judge']['input_tokens']} in / "
         f"{tokens['judge']['output_tokens']} out.",
     ]
+    return lines
 
 
-def _render_earlier(now: dict[str, Any], before: dict[str, Any]) -> list[str]:
-    """Before/after of the answer-prompt fix: same gold set, same judge, same index."""
-    b, a = before["metrics"], now["metrics"]
-    return [
+def _span(values: list[float | int | None], fmt: str = "{}") -> str:
+    present = [v for v in values if v is not None]
+    low, high = min(present), max(present)
+    return fmt.format(low) if low == high else f"{fmt.format(low)} to {fmt.format(high)}"
+
+
+def _render_earlier(now: dict[str, Any], before: list[dict[str, Any]]) -> list[str]:
+    """Before/after of the answer-prompt fix: same gold set, judge and index, single runs."""
+    old = [d["metrics"] for d in before]
+    new = now["metrics"]
+    dropped_note = [
+        f"{_abstention_breakdown(d['per_query'])[0]} of {d['metrics']['no_match']} in `{name}`"
+        for d, name in zip(before, EARLIER_FAITHFULNESS_FILES[-len(before) :], strict=True)
+        if any("answer_notes" in q for q in d["per_query"])
+    ]
+    unrecorded = any("answer_notes" not in q for d in before for q in d["per_query"])
+    after_dropped = _abstention_breakdown(now["per_query"])[0]
+    lines = [
         "",
         "### Before and after the citation-prompt fix",
         "",
-        "The earlier run (`faithfulness-prefix-bug.json`) used the answer prompt that listed "
-        "excerpts as `[0] doc_id=...`; the model often cited the position instead of the doc_id "
-        "and the citation check turned those answers into abstentions. The current run labels "
-        "excerpts by doc_id only.",
+        f"Every row is one run on the same gold set, index and judge; the agent is "
+        f"nondeterministic, so each row is a single draw. {len(before)} runs were made with the "
+        "earlier answer prompt, which listed excerpts as `[0] doc_id=...`; the model often cited "
+        "the position instead of the doc_id and the citation check turned those answers into "
+        "abstentions. The current run labels excerpts by doc_id only.",
         "",
         "| Run | answers judged | abstained | claims supported | claim support | "
         "answers with every claim supported |",
         "| --- | --- | --- | --- | --- | --- |",
-        _faith_row("before the fix", before["date"], b),
-        _faith_row("after the fix", now["date"], a),
     ]
+    names = ["before the fix, first run", "before the fix, second run"][-len(before) :]
+    for label, d in zip(names, before, strict=True):
+        lines.append(_faith_row(label, d["date"], d["metrics"]))
+    lines.append(_faith_row("after the fix", now["date"], new))
+    lines += [
+        "",
+        "The answered sets differ in size "
+        f"({', '.join(str(m['answered_and_judged']) for m in [*old, new])} answers), and "
+        "abstentions are excluded from the rates, so the rates are not like-for-like.",
+        "",
+        "Differences in claim support and in all-claims-supported between the earlier runs and "
+        f"the current one (claim support {_span([m['claim_support_rate'] for m in old], '{:.3f}')} "
+        f"before, {_fmt(new['claim_support_rate'])} after; all-claims-supported "
+        f"{_span([m['faithful_answer_rate'] for m in old], '{:.3f}')} before, "
+        f"{_fmt(new['faithful_answer_rate'])} after) are within the run-to-run noise of single "
+        f"nondeterministic runs; the earlier runs alone abstained on "
+        f"{_span([m['no_match'] for m in old])} queries.",
+        "",
+        "The only clear effect of the fix is fewer abstentions: the abstentions after dropped "
+        f"citations were {'; '.join(dropped_note) or 'not recorded'} before the fix and "
+        f"{after_dropped} of {new['no_match']} after it."
+        + (" Runs without per-answer notes cannot be counted." if unrecorded else ""),
+    ]
+    return lines
 
 
 def _faith_row(label: str, date: str, m: dict[str, Any]) -> str:
-    rate, faithful = m["claim_support_rate"], m["faithful_answer_rate"]
     return (
         f"| {label} ({date}) | {m['answered_and_judged']} of {m['queries']} | {m['no_match']} | "
-        f"{m['claims_supported']} of {m['claims']} | "
-        f"{'n/a' if rate is None else f'{rate:.3f}'} | "
-        f"{'n/a' if faithful is None else f'{faithful:.3f}'} |"
+        f"{m['claims_supported']} of {m['claims']} | {_fmt(m['claim_support_rate'])} | "
+        f"{_fmt(m['faithful_answer_rate'])} |"
     )
 
 

@@ -106,7 +106,7 @@ def test_summary_tables_copy_the_recorded_numbers(results):
     assert "Baseline: **bge, section chunking**" in text
     assert "6 of 8" in text and "0.750" in text and "0.667" in text
     assert "deepseek-flash (DeepSeek, a different model family)" in text
-    assert "citation check dropped it): 1 of 1" in text
+    assert "Abstentions: 1 of 1 followed citations that were all dropped" in text
     assert "synthetic" in text
 
 
@@ -174,35 +174,108 @@ def test_a_faithfulness_result_from_another_gold_set_or_index_is_refused(results
     assert "differ" in capsys.readouterr().err and not out.exists()
 
 
-def test_earlier_faithfulness_run_is_shown_as_before_and_after_and_not_read_as_a_retrieval_run(
-    results,
-):
-    earlier = {
+def faith_variant(date, judged, abstained, claims, supported, every, per_query):
+    return {
         **FAITHFULNESS,
-        "date": "2026-11-13",
+        "date": date,
         "metrics": {
             **FAITHFULNESS["metrics"],
-            "answered_and_judged": 1,
-            "no_match": 3,
-            "claims": 4,
-            "claims_supported": 3,
-            "claim_support_rate": 0.75,
-            "faithful_answer_rate": 0.0,
+            "answered_and_judged": judged,
+            "no_match": abstained,
+            "claims": claims,
+            "claims_supported": supported,
+            "claim_support_rate": supported / claims,
+            "faithful_answer_rate": every,
         },
+        "per_query": per_query,
     }
-    (results / "faithfulness-prefix-bug.json").write_text(json.dumps(earlier))
-    (results / "faithfulness-prefix-bug-first-run.json").write_text(json.dumps(earlier))
+
+
+DROPPED = "dropped citation of a document that was not retrieved: 0"
+
+
+def write_earlier(results):
+    # first run: no per-answer notes recorded; second run: notes recorded
+    first = faith_variant(
+        "2026-11-12", 2, 5, 10, 7, 0.5, [{"id": "q1", "no_match": True}, {"id": "q2"}]
+    )
+    second = faith_variant(
+        "2026-11-13",
+        4,
+        3,
+        20,
+        14,
+        0.0,
+        [
+            {"id": "q1", "no_match": True, "graded_relevant": 2, "answer_notes": [DROPPED]},
+            {"id": "q2", "no_match": True, "graded_relevant": 1, "answer_notes": [DROPPED]},
+            {"id": "q3", "no_match": True, "graded_relevant": 0, "answer_notes": []},
+        ],
+    )
+    (results / "faithfulness-prefix-bug-first-run.json").write_text(json.dumps(first))
+    (results / "faithfulness-prefix-bug.json").write_text(json.dumps(second))
+
+
+def test_both_earlier_runs_are_shown_with_a_noise_statement_and_not_read_as_retrieval_runs(
+    results,
+):
+    write_earlier(results)
     runs, faithfulness = summary.load_runs(results)
     assert [r.name for r in runs] == sorted(
         ["bge-section", "bge-section-rerank-x", "minilm-section"], key=lambda n: n + ".json"
     )
-    text = summary.render_summary(runs, faithfulness, summary.load_earlier_faithfulness(results))
+    earlier = summary.load_earlier_faithfulness(results)
+    assert [d["date"] for d in earlier] == ["2026-11-12", "2026-11-13"]
+    text = summary.render_summary(runs, faithfulness, earlier)
     assert "Before and after the citation-prompt fix" in text
-    assert "| before the fix (2026-11-13) | 1 of 4 | 3 | 3 of 4 | 0.750 | 0.000 |" in text
+    assert (
+        "| before the fix, first run (2026-11-12) | 2 of 4 | 5 | 7 of 10 | 0.700 | 0.500 |" in text
+    )
+    assert (
+        "| before the fix, second run (2026-11-13) | 4 of 4 | 3 | 14 of 20 | 0.700 | 0.000 |"
+        in text
+    )
     assert "| after the fix (2026-11-14) | 3 of 4 | 1 | 6 of 8 | 0.750 | 0.667 |" in text
+    assert "(2, 4, 3 answers)" in text and "not like-for-like" in text
+    assert "claim support 0.700 before, 0.750 after" in text
+    assert "all-claims-supported 0.000 to 0.500 before, 0.667 after" in text
+    assert "within the run-to-run noise of single nondeterministic runs" in text
+    assert "abstained on 3 to 5 queries" in text
+    assert "The only clear effect of the fix is fewer abstentions" in text
+    assert "2 of 3 in `faithfulness-prefix-bug.json` before the fix and 1 of 1 after it" in text
+    assert "Runs without per-answer notes cannot be counted." in text
+    assert "A single run of a nondeterministic agent." in text
+    assert "The rates below cover only the 3 judged answers" in text
 
 
-def test_earlier_run_on_another_gold_set_is_refused(results):
-    earlier = {**FAITHFULNESS, "gold": {"sha256": "x" * 24}}
-    with pytest.raises(ValueError, match="differ in gold set"):
-        summary.render_summary(*summary.load_runs(results), earlier)
+def test_current_run_abstentions_are_split_into_dropped_unexplained_and_no_retrieval():
+    per_query = [
+        {"id": "q1", "no_match": True, "graded_relevant": 3, "answer_notes": [DROPPED]},
+        {
+            "id": "q2",
+            "no_match": True,
+            "graded_relevant": 2,
+            "answer_notes": ["no valid citations"],
+        },
+        {"id": "q3", "no_match": True, "graded_relevant": 1, "answer_notes": []},
+        {"id": "q4", "no_match": True, "graded_relevant": 0, "answer_notes": []},
+        {"id": "q5", "no_match": False, "graded_relevant": 2, "answer_notes": [DROPPED]},
+    ]
+    assert summary._abstention_breakdown(per_query) == (1, ["q2", "q3"], 1)
+    text = "\n".join(summary._render_faithfulness({**FAITHFULNESS, "per_query": per_query}))
+    assert "1 of 4 followed citations that were all dropped" in text
+    assert (
+        "2 had relevant chunks but no valid citation or text (q2, q3), cause not explained" in text
+    )
+    assert "1 had no relevant retrieval" in text
+
+
+def test_either_earlier_run_on_another_gold_set_is_refused(results):
+    write_earlier(results)
+    runs, faithfulness = summary.load_runs(results)
+    for name in summary.EARLIER_FAITHFULNESS_FILES:
+        earlier = summary.load_earlier_faithfulness(results)
+        stale = {**earlier[summary.EARLIER_FAITHFULNESS_FILES.index(name)], "gold": {"sha256": "x"}}
+        mixed = [stale if d["date"] == stale["date"] else d for d in earlier]
+        with pytest.raises(ValueError, match="differ in gold set"):
+            summary.render_summary(runs, faithfulness, mixed)

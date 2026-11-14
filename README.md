@@ -103,32 +103,45 @@ Baseline: **bge, section chunking** (highest MRR of the models above).
 
 ### Faithfulness (LLM judge)
 
-- Agent: claude-haiku-5-5 (Anthropic). Judge: deepseek-flash (DeepSeek, a different model family), temperature 0.0. Run on 2026-11-13.
-- Queries: 34; judged answers: 27; abstained (no close match): 7; errors: 0.
-- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 0 of 7.
+- Agent: claude-haiku-5-5 (Anthropic). Judge: deepseek-flash (DeepSeek, a different model family), temperature 0.0. Run on 2026-11-13. A single run of a nondeterministic agent.
+- Queries: 34; judged answers: 27; abstained (no close match): 7; errors: 0. The rates below cover only the 27 judged answers; abstentions are not scored.
+- Abstentions: 0 of 7 followed citations that were all dropped by the citation check (a cited document that was not retrieved); 5 had relevant chunks but no valid citation or text (q006, q009, q027, q029, q032), cause not explained; 2 had no relevant retrieval.
 - Claims supported by the cited chunks: 239 of 336 (0.711).
 - Answers with every claim supported: 0.037.
 - Tokens: agent 376959 in / 34754 out, judge 22753 in / 17458 out.
 
 #### Before and after the citation-prompt fix
 
-The earlier run (`faithfulness-prefix-bug.json`) used the answer prompt that listed excerpts as `[0] doc_id=...`; the model often cited the position instead of the doc_id and the citation check turned those answers into abstentions. The current run labels excerpts by doc_id only.
+Every row is one run on the same gold set, index and judge; the agent is nondeterministic, so each row is a single draw. 2 runs were made with the earlier answer prompt, which listed excerpts as `[0] doc_id=...`; the model often cited the position instead of the doc_id and the citation check turned those answers into abstentions. The current run labels excerpts by doc_id only.
 
 | Run | answers judged | abstained | claims supported | claim support | answers with every claim supported |
 | --- | --- | --- | --- | --- | --- |
-| before the fix (2026-11-13) | 19 of 34 | 15 | 147 of 219 | 0.671 | 0.000 |
+| before the fix, first run (2026-11-13) | 15 of 34 | 19 | 125 of 183 | 0.683 | 0.067 |
+| before the fix, second run (2026-11-13) | 19 of 34 | 15 | 147 of 219 | 0.671 | 0.000 |
 | after the fix (2026-11-13) | 27 of 34 | 7 | 239 of 336 | 0.711 | 0.037 |
+
+The answered sets differ in size (15, 19, 27 answers), and abstentions are excluded from the rates, so the rates are not like-for-like.
+
+Differences in claim support and in all-claims-supported between the earlier runs and the current one (claim support 0.671 to 0.683 before, 0.711 after; all-claims-supported 0.000 to 0.067 before, 0.037 after) are within the run-to-run noise of single nondeterministic runs; the earlier runs alone abstained on 15 to 19 queries.
+
+The only clear effect of the fix is fewer abstentions: the abstentions after dropped citations were 11 of 15 in `faithfulness-prefix-bug.json` before the fix and 0 of 7 after it. Runs without per-answer notes cannot be counted.
 
 Reading these numbers: faithfulness here means each claim is supported by the chunks the answer
 cites; it is not correctness against the held-out root cause. The judge is strict, so generic advice
 that no excerpt mentions counts as unsupported, which is why almost no answer has every claim
-supported. The first run exposed an agent bug: the answer prompt listed excerpts as `[0] doc_id=...`,
-the model cited those positions, the citation check dropped them and the agent abstained. The prompt
-now labels excerpts by doc_id only (the citation check is unchanged), and the before and after rows
-above come from `faithfulness-prefix-bug.json` and `faithfulness.json`. The remaining abstentions
-are rows in the result file with no relevant retrieval or no citations in the model's answer. The
-rates describe only the answers that were judged, and the agent is nondeterministic, so each figure
-comes from one run.
+supported. The judge ran with `thinking` disabled so that temperature 0 applies (set in the DeepSeek
+client; the faithfulness result files recorded so far predate the `judge_thinking` config field and
+do not list it).
+
+The first runs exposed an agent bug: the answer prompt listed excerpts as `[0] doc_id=...`, the model
+cited those positions, the citation check dropped them and the agent abstained. The prompt now labels
+excerpts by doc_id only (the citation check is unchanged). Three runs exist: two before the fix and
+one after, all single draws of a nondeterministic agent. Two runs with the same buggy prompt
+abstained on 19 and 15 queries, so the differences in claim support and in all-claims-supported
+between the runs are within noise. The only clear effect of the fix is fewer abstentions. Five
+abstentions after the fix (q006, q009, q027, q029, q032) are unexplained: the grader accepted chunks
+but the answer had no valid citation or text, and they were not investigated. The 27 judged answers
+are therefore not the agent's ceiling, and the rates describe judged answers only.
 
 ### Limitations
 
