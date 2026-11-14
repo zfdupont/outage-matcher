@@ -371,3 +371,33 @@ def test_evidence_lists_the_chunks_the_answerer_saw_before_the_rest(search_log):
     )
     result = make_agent(client).ask(QUESTION)
     assert [c.doc_id for c in result.evidence] == [2, 1]
+
+
+def test_answer_excerpts_are_labeled_by_doc_id_only_while_the_grader_keeps_positions(search_log):
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True, True)],
+        submit_answer=[answer([1])],
+    )
+    make_agent(client).ask(QUESTION)
+    grade_prompt = client.calls_for("submit_grades")[0]["messages"][0]["content"]
+    answer_prompt = client.calls_for("submit_answer")[0]["messages"][0]["content"]
+    assert "[0] doc_id=1" in grade_prompt and "[1] doc_id=2" in grade_prompt
+    assert "doc_id=1 |" in answer_prompt and "doc_id=2 |" in answer_prompt
+    assert "[0]" not in answer_prompt and "[1]" not in answer_prompt
+    system = client.calls_for("submit_answer")[0]["system"]
+    assert "never cite by position" in system
+
+
+def test_citing_an_excerpt_position_instead_of_a_doc_id_is_dropped_and_abstains(search_log):
+    """The failure seen in the first faithfulness run: the model answered with excerpt numbers
+    (0 and 1) while the doc ids were 1 and 2. Position 0 is no document, so the citation check
+    drops it; the agent must not accept it as a citation of some other document."""
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True, True)],
+        submit_answer=[answer([0])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert result.answer.no_match and result.answer.citations == []
+    assert any("dropped citation" in n and "0" in n for n in result.answer.notes)
