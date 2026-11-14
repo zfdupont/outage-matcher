@@ -17,17 +17,19 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 - `uv run outage-matcher ingest` - collect, chunk, embed and index postmortems (`--skip-collect` reuses `data/raw`)
 - `uv run outage-matcher search "<query>" [--model bge|minilm] [--k 5]` - search the index (both models by default)
 - `uv run outage-matcher ask "<incident description>" [--transcript PATH]` - run the agent (needs a real `ANTHROPIC_API_KEY`; model via `AGENT_MODEL`, retry cap via `AGENT_MAX_RETRIES`, API timeout seconds via `AGENT_REQUEST_TIMEOUT`, SDK retries via `AGENT_API_MAX_RETRIES`)
-- `uv run outage-matcher serve [--host H] [--port P]` - run the API (`GET /health`, `POST /ask`; 503 until the agent is wired)
+- `uv run outage-matcher fetch-raw` - download the manifest's pages that are missing from `data/raw` (what CI does on a cache miss)
+- `uv run outage-matcher serve [--host H] [--port P]` - run the API (`GET /health`, `POST /ask` runs the agent; `/ask` is 503 without a real `ANTHROPIC_API_KEY`)
 - `docker compose up --build` - db plus the API container (host port `API_PORT`, default 8000)
 - `uv run pytest -m db -o addopts=""` - opt-in tests that need the running Postgres container
 - `uv run python evals/build_gold.py [--dry-run]` - build `evals/gold.jsonl` (needs `DEEPSEEK_API_KEY`; model via `DEEPSEEK_MODEL`)
 - `uv run python -m outage_matcher.evals.run_retrieval --model bge [--chunking neighbor] [--reranker]` - recall@k and MRR to `evals/results/<run>.json`
 - `uv run python evals/run_faithfulness.py [--limit N] [--dry-run]` - agent answers judged by DeepSeek (needs both API keys)
 - `uv run python -m outage_matcher.evals.summary` - write `evals/results/summary.md` and `evals/baseline.json` from the result files
+- `uv run python -m outage_matcher.evals.gate index` / `compare RESULT.json` - the CI regression checks against `evals/baseline.json` (see `docs/ci-eval-gate.md`)
 - `uv run python scripts/compare_embeddings_m1.py` - print the M1 two-model comparison tables
 
 ## Architecture
-`src/outage_matcher/`: ingest (collect, chunk, embed, index), search, config, agent (`tools.py`, `graph.py` LangGraph retrieve/grade/rewrite/answer, `transcript.py`), evals (`gold.py`, `build_gold.py`, `metrics.py`, `retrieval.py`, `chunking.py`, `rerank.py`, `run_retrieval.py`, `faithfulness.py`, `run_faithfulness.py`, `summary.py`), api. Gold set, results and baseline under `evals/` (thin entry scripts there call the modules).
+`src/outage_matcher/`: ingest (collect, chunk, embed, index), search, config, observability (`get_tracer`, `trace_span`, `flush`; no-op without Langfuse keys, see `docs/tracing.md`), agent (`tools.py`, `graph.py` LangGraph retrieve/grade/rewrite/answer with spans on each node and tool call, `transcript.py`), api (`app.py` FastAPI app taking an agent factory, `agent.py` adapter that opens one database connection per request and maps the agent result to `AskResponse`, `models.py`), evals (`gold.py`, `build_gold.py`, `metrics.py`, `retrieval.py`, `chunking.py`, `rerank.py`, `run_retrieval.py`, `faithfulness.py`, `run_faithfulness.py`, `summary.py`, `gate.py` the CI regression gate). `cli.py` wires `ingest`, `fetch-raw`, `search`, `ask` and `serve` (the serve agent factory lives there). Gold set, results and baseline under `evals/` (thin entry scripts there call the modules). CI: `.github/workflows/ci.yml` (lint, format, tests) and `eval.yml` (retrieval gate, optional faithfulness job; see `docs/ci-eval-gate.md`). Docker: `Dockerfile` (multi-stage, non-root) and `docker-compose.yml` (`db`, `api`).
 
 ## Environment Variables
 ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, VOYAGE_API_KEY, OPENAI_API_KEY, DATABASE_URL, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT, API_PORT, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
