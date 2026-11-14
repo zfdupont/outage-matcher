@@ -172,3 +172,37 @@ def test_a_faithfulness_result_from_another_gold_set_or_index_is_refused(results
     argv = ["--results-dir", str(results), "--out", str(out), "--baseline-out", str(results / "b")]
     assert summary.main(argv) == 1
     assert "differ" in capsys.readouterr().err and not out.exists()
+
+
+def test_earlier_faithfulness_run_is_shown_as_before_and_after_and_not_read_as_a_retrieval_run(
+    results,
+):
+    earlier = {
+        **FAITHFULNESS,
+        "date": "2026-11-13",
+        "metrics": {
+            **FAITHFULNESS["metrics"],
+            "answered_and_judged": 1,
+            "no_match": 3,
+            "claims": 4,
+            "claims_supported": 3,
+            "claim_support_rate": 0.75,
+            "faithful_answer_rate": 0.0,
+        },
+    }
+    (results / "faithfulness-prefix-bug.json").write_text(json.dumps(earlier))
+    (results / "faithfulness-prefix-bug-first-run.json").write_text(json.dumps(earlier))
+    runs, faithfulness = summary.load_runs(results)
+    assert [r.name for r in runs] == sorted(
+        ["bge-section", "bge-section-rerank-x", "minilm-section"], key=lambda n: n + ".json"
+    )
+    text = summary.render_summary(runs, faithfulness, summary.load_earlier_faithfulness(results))
+    assert "Before and after the citation-prompt fix" in text
+    assert "| before the fix (2026-11-13) | 1 of 4 | 3 | 3 of 4 | 0.750 | 0.000 |" in text
+    assert "| after the fix (2026-11-14) | 3 of 4 | 1 | 6 of 8 | 0.750 | 0.667 |" in text
+
+
+def test_earlier_run_on_another_gold_set_is_refused(results):
+    earlier = {**FAITHFULNESS, "gold": {"sha256": "x" * 24}}
+    with pytest.raises(ValueError, match="differ in gold set"):
+        summary.render_summary(*summary.load_runs(results), earlier)
