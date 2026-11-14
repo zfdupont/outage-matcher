@@ -23,6 +23,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     failures: list[dict[str, str]] = []
     if args.skip_collect:
         entries = collect_mod.read_manifest()
+        failures = collect_mod.read_failures()
         if not entries:
             _log("no manifest found; run without --skip-collect first")
             return 1

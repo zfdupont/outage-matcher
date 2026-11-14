@@ -80,3 +80,31 @@ def test_ingest_runs_stages_and_writes_stats(tmp_path, monkeypatch, capsys):
     assert "indexed 1 documents" in capsys.readouterr().out
     stats = json.loads((data / "corpus_stats.json").read_text())
     assert stats["document_count"] == 1 and stats["per_source"]["community"]["documents"] == 1
+
+
+def test_ingest_skip_collect_reuses_manifest_and_recorded_failures(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    data = tmp_path / "data"
+    (data / "raw").mkdir(parents=True)
+    entry = ManifestEntry("d1", "https://x.test/a", "A", "github", "2026-11-13", "database")
+    (data / "manifest.jsonl").write_text(json.dumps(entry.__dict__) + "\n")
+    (data / "collect_failures.jsonl").write_text(
+        json.dumps({"url": "u", "source": "community", "reason": "http 404"}) + "\n"
+    )
+    (data / "raw" / "d1.html").write_text(
+        "<html><body><h1>T</h1><p>"
+        + "The primary failed and replicas lagged behind. " * 5
+        + "</p></body></html>"
+    )
+    monkeypatch.setattr(cli.db, "connect", fake_connect)
+    monkeypatch.setattr(
+        cli.index_mod, "write_index", lambda conn, docs, log=None: cli.index_mod.IndexResult()
+    )
+
+    def no_network(**kw):
+        raise AssertionError("collect must not run with --skip-collect")
+
+    monkeypatch.setattr(cli.collect_mod, "collect", no_network)
+    assert cli.main(["ingest", "--skip-collect"]) == 0
+    stats = json.loads((data / "corpus_stats.json").read_text())
+    assert stats["failures"]["collect"] == 1 and stats["document_count"] == 1

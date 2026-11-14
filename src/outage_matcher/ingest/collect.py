@@ -452,6 +452,12 @@ def read_manifest(path: Path = MANIFEST_PATH) -> list[ManifestEntry]:
     ]
 
 
+def read_failures(path: Path = FAILURES_PATH) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+
 def write_manifest(entries: Iterable[ManifestEntry], path: Path = MANIFEST_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     ordered = sorted(entries, key=lambda e: (e.source, e.url))

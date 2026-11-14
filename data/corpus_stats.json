@@ -1,0 +1,60 @@
+{
+  "generated": "2026-11-13",
+  "embedding_models": {
+    "bge": "BAAI/bge-small-en-v1.5",
+    "minilm": "sentence-transformers/all-MiniLM-L6-v2"
+  },
+  "document_count": 235,
+  "chunk_count": 4092,
+  "per_source": {
+    "cloudflare": {
+      "documents": 29,
+      "chunks": 563
+    },
+    "community": {
+      "documents": 103,
+      "chunks": 1729
+    },
+    "gcp": {
+      "documents": 22,
+      "chunks": 843
+    },
+    "github": {
+      "documents": 81,
+      "chunks": 957
+    }
+  },
+  "chunks_per_section_type": {
+    "impact": 404,
+    "other": 2141,
+    "remediation": 196,
+    "root_cause": 122,
+    "summary": 1110,
+    "timeline": 119
+  },
+  "documents_per_system_type": {
+    "compute": 44,
+    "database": 60,
+    "hardware": 10,
+    "identity": 15,
+    "messaging": 4,
+    "network": 56,
+    "other": 35,
+    "storage": 11
+  },
+  "failures": {
+    "collect": 99,
+    "parse": 1,
+    "by_reason": {
+      "denied": 49,
+      "disallowed by robots.txt": 4,
+      "http 403": 2,
+      "http 404": 4,
+      "no chunks extracted": 1,
+      "page meta robots forbids indexing": 17,
+      "robots.txt fetch failed": 1,
+      "too large": 1,
+      "too little text": 21
+    }
+  }
+}
