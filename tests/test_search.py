@@ -66,3 +66,60 @@ def test_search_returns_k_rows_beyond_default_ef_search_and_for_rare_filters():
             )
             assert len(rare) == 5 and {h.system_type for h in rare} == {"network"}
         conn.rollback()
+
+
+class RecordingConn:
+    def __init__(self):
+        self.statements = []
+
+    def transaction(self):
+        import contextlib
+
+        return contextlib.nullcontext()
+
+    def execute(self, sql, params=()):
+        self.statements.append((sql, params))
+
+        class Rows:
+            def fetchall(self):
+                return []
+
+        return Rows()
+
+
+def test_search_hides_excluded_chunks_in_the_query():
+    conn = RecordingConn()
+    search(conn, "q", "bge", k=3, exclude_chunk_ids={9, 4}, embedder=FakeEmbedder())
+    sql, params = conn.statements[-1]
+    assert "WHERE c.id <> ALL(%s::int[])" in sql
+    assert params[1] == [4, 9]
+    assert any("iterative_scan" in s for s, _ in conn.statements)  # filtered scans keep going
+
+
+def test_search_combines_system_type_and_exclusion():
+    conn = RecordingConn()
+    search(conn, "q", "bge", system_type="network", exclude_chunk_ids=[5], embedder=FakeEmbedder())
+    sql, params = conn.statements[-1]
+    assert "WHERE p.system_type = %s AND c.id <> ALL(%s::int[])" in sql
+    assert params[1:3] == ["network", [5]]
+
+
+def test_search_without_filters_has_no_where_clause():
+    conn = RecordingConn()
+    search(conn, "q", "bge", embedder=FakeEmbedder())
+    sql, _ = conn.statements[-1]
+    assert "WHERE" not in sql
+    assert not any("iterative_scan" in s for s, _ in conn.statements)
+
+
+@pytest.mark.db
+def test_search_excludes_chunks_in_the_real_index():
+    with db.connect() as conn:
+        first = search(conn, "database failover", "bge", k=3)
+        gone = conn.execute(
+            "SELECT id FROM chunks WHERE postmortem_id = %s AND text = %s",
+            (first[0].postmortem_id, first[0].text),
+        ).fetchone()[0]
+        again = search(conn, "database failover", "bge", k=3, exclude_chunk_ids=[gone])
+    assert all(h.text != first[0].text or h.postmortem_id != first[0].postmortem_id for h in again)
+    assert len(again) == 3

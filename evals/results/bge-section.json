@@ -1,0 +1,719 @@
+{
+  "run": "bge-section",
+  "date": "2026-11-13",
+  "config": {
+    "embedding_model": "bge",
+    "embedding_model_name": "BAAI/bge-small-en-v1.5",
+    "chunking": "section",
+    "chunking_params": {},
+    "reranker": null,
+    "rerank_depth": null,
+    "search": "exact cosine similarity over all chunks, held-out chunks excluded per query, documents ranked by best chunk"
+  },
+  "index": {
+    "version": "34c67d0bba77",
+    "documents": 235,
+    "chunks": 4482
+  },
+  "gold": {
+    "path": "evals/gold.jsonl",
+    "sha256": "23e49b91b78f1362ee1b1242ba8ecd186cc54ae4ebb4f8c9afe4ed95a1d8c1ea",
+    "queries": 34,
+    "generation": {
+      "model": "deepseek-flash",
+      "temperature": 0.2,
+      "date": "2026-11-13",
+      "seed": 0
+    }
+  },
+  "code_commit": "5de8a19",
+  "metrics": {
+    "recall@1": 0.4117647058823529,
+    "recall@3": 0.5882352941176471,
+    "recall@5": 0.6470588235294118,
+    "recall@10": 0.7352941176470589,
+    "mrr": 0.5194132723794472
+  },
+  "per_query": [
+    {
+      "id": "q001",
+      "doc_id": 27,
+      "relevant_doc_ids": [
+        27
+      ],
+      "rank": 6,
+      "top_doc_ids": [
+        12,
+        165,
+        195,
+        232,
+        226,
+        27,
+        222,
+        160,
+        1,
+        23
+      ]
+    },
+    {
+      "id": "q002",
+      "doc_id": 1,
+      "relevant_doc_ids": [
+        1
+      ],
+      "rank": 3,
+      "top_doc_ids": [
+        165,
+        226,
+        1,
+        232,
+        195,
+        222,
+        191,
+        171,
+        12,
+        8
+      ]
+    },
+    {
+      "id": "q003",
+      "doc_id": 117,
+      "relevant_doc_ids": [
+        117
+      ],
+      "rank": 59,
+      "top_doc_ids": [
+        147,
+        172,
+        94,
+        68,
+        97,
+        36,
+        153,
+        180,
+        209,
+        66
+      ]
+    },
+    {
+      "id": "q004",
+      "doc_id": 89,
+      "relevant_doc_ids": [
+        89
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        89,
+        39,
+        113,
+        33,
+        18,
+        72,
+        147,
+        105,
+        233,
+        34
+      ]
+    },
+    {
+      "id": "q005",
+      "doc_id": 42,
+      "relevant_doc_ids": [
+        42
+      ],
+      "rank": 2,
+      "top_doc_ids": [
+        53,
+        42,
+        167,
+        202,
+        40,
+        163,
+        55,
+        84,
+        113,
+        230
+      ]
+    },
+    {
+      "id": "q006",
+      "doc_id": 22,
+      "relevant_doc_ids": [
+        22
+      ],
+      "rank": 7,
+      "top_doc_ids": [
+        120,
+        66,
+        2,
+        147,
+        68,
+        133,
+        22,
+        148,
+        176,
+        224
+      ]
+    },
+    {
+      "id": "q007",
+      "doc_id": 100,
+      "relevant_doc_ids": [
+        100
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        100,
+        147,
+        223,
+        203,
+        212,
+        8,
+        62,
+        187,
+        230,
+        196
+      ]
+    },
+    {
+      "id": "q008",
+      "doc_id": 62,
+      "relevant_doc_ids": [
+        62
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        62,
+        63,
+        162,
+        187,
+        156,
+        54,
+        208,
+        224,
+        202,
+        44
+      ]
+    },
+    {
+      "id": "q009",
+      "doc_id": 7,
+      "relevant_doc_ids": [
+        7
+      ],
+      "rank": 5,
+      "top_doc_ids": [
+        200,
+        201,
+        224,
+        211,
+        7,
+        24,
+        2,
+        59,
+        209,
+        66
+      ]
+    },
+    {
+      "id": "q010",
+      "doc_id": 74,
+      "relevant_doc_ids": [
+        74
+      ],
+      "rank": 56,
+      "top_doc_ids": [
+        2,
+        87,
+        224,
+        176,
+        59,
+        62,
+        94,
+        223,
+        171,
+        66
+      ]
+    },
+    {
+      "id": "q011",
+      "doc_id": 158,
+      "relevant_doc_ids": [
+        158
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        158,
+        66,
+        178,
+        224,
+        163,
+        202,
+        184,
+        176,
+        189,
+        167
+      ]
+    },
+    {
+      "id": "q012",
+      "doc_id": 106,
+      "relevant_doc_ids": [
+        106
+      ],
+      "rank": 2,
+      "top_doc_ids": [
+        147,
+        106,
+        207,
+        149,
+        172,
+        59,
+        51,
+        184,
+        160,
+        153
+      ]
+    },
+    {
+      "id": "q013",
+      "doc_id": 110,
+      "relevant_doc_ids": [
+        110
+      ],
+      "rank": 7,
+      "top_doc_ids": [
+        111,
+        219,
+        78,
+        161,
+        211,
+        11,
+        110,
+        75,
+        115,
+        15
+      ]
+    },
+    {
+      "id": "q014",
+      "doc_id": 235,
+      "relevant_doc_ids": [
+        235
+      ],
+      "rank": 13,
+      "top_doc_ids": [
+        224,
+        232,
+        39,
+        59,
+        32,
+        162,
+        226,
+        188,
+        33,
+        120
+      ]
+    },
+    {
+      "id": "q015",
+      "doc_id": 67,
+      "relevant_doc_ids": [
+        67
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        67,
+        63,
+        210,
+        187,
+        203,
+        223,
+        209,
+        8,
+        147,
+        212
+      ]
+    },
+    {
+      "id": "q016",
+      "doc_id": 34,
+      "relevant_doc_ids": [
+        34
+      ],
+      "rank": 4,
+      "top_doc_ids": [
+        176,
+        158,
+        33,
+        34,
+        232,
+        39,
+        227,
+        214,
+        32,
+        223
+      ]
+    },
+    {
+      "id": "q017",
+      "doc_id": 12,
+      "relevant_doc_ids": [
+        12
+      ],
+      "rank": 2,
+      "top_doc_ids": [
+        165,
+        12,
+        226,
+        232,
+        1,
+        160,
+        222,
+        195,
+        191,
+        27
+      ]
+    },
+    {
+      "id": "q018",
+      "doc_id": 87,
+      "relevant_doc_ids": [
+        87
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        87,
+        39,
+        224,
+        63,
+        54,
+        53,
+        64,
+        191,
+        196,
+        184
+      ]
+    },
+    {
+      "id": "q019",
+      "doc_id": 233,
+      "relevant_doc_ids": [
+        233
+      ],
+      "rank": 3,
+      "top_doc_ids": [
+        33,
+        39,
+        233,
+        232,
+        2,
+        25,
+        223,
+        86,
+        124,
+        70
+      ]
+    },
+    {
+      "id": "q020",
+      "doc_id": 15,
+      "relevant_doc_ids": [
+        15
+      ],
+      "rank": 58,
+      "top_doc_ids": [
+        25,
+        66,
+        162,
+        2,
+        8,
+        50,
+        203,
+        165,
+        224,
+        39
+      ]
+    },
+    {
+      "id": "q021",
+      "doc_id": 125,
+      "relevant_doc_ids": [
+        125
+      ],
+      "rank": 3,
+      "top_doc_ids": [
+        39,
+        33,
+        125,
+        59,
+        124,
+        97,
+        32,
+        117,
+        86,
+        224
+      ]
+    },
+    {
+      "id": "q022",
+      "doc_id": 26,
+      "relevant_doc_ids": [
+        26
+      ],
+      "rank": 46,
+      "top_doc_ids": [
+        186,
+        162,
+        113,
+        67,
+        107,
+        173,
+        176,
+        206,
+        226,
+        194
+      ]
+    },
+    {
+      "id": "q023",
+      "doc_id": 79,
+      "relevant_doc_ids": [
+        79
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        79,
+        118,
+        51,
+        172,
+        171,
+        55,
+        74,
+        213,
+        155,
+        53
+      ]
+    },
+    {
+      "id": "q024",
+      "doc_id": 52,
+      "relevant_doc_ids": [
+        52
+      ],
+      "rank": 37,
+      "top_doc_ids": [
+        214,
+        220,
+        169,
+        211,
+        156,
+        224,
+        11,
+        163,
+        172,
+        176
+      ]
+    },
+    {
+      "id": "q025",
+      "doc_id": 119,
+      "relevant_doc_ids": [
+        119
+      ],
+      "rank": 27,
+      "top_doc_ids": [
+        35,
+        171,
+        209,
+        147,
+        187,
+        221,
+        139,
+        195,
+        144,
+        36
+      ]
+    },
+    {
+      "id": "q026",
+      "doc_id": 40,
+      "relevant_doc_ids": [
+        40
+      ],
+      "rank": 31,
+      "top_doc_ids": [
+        48,
+        54,
+        59,
+        209,
+        102,
+        66,
+        17,
+        39,
+        125,
+        196
+      ]
+    },
+    {
+      "id": "q027",
+      "doc_id": 113,
+      "relevant_doc_ids": [
+        113
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        113,
+        84,
+        212,
+        39,
+        2,
+        120,
+        195,
+        86,
+        34,
+        176
+      ]
+    },
+    {
+      "id": "q028",
+      "doc_id": 55,
+      "relevant_doc_ids": [
+        55
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        55,
+        51,
+        211,
+        169,
+        224,
+        206,
+        190,
+        54,
+        182,
+        203
+      ]
+    },
+    {
+      "id": "q029",
+      "doc_id": 68,
+      "relevant_doc_ids": [
+        68
+      ],
+      "rank": 94,
+      "top_doc_ids": [
+        54,
+        224,
+        39,
+        97,
+        84,
+        60,
+        162,
+        165,
+        59,
+        18
+      ]
+    },
+    {
+      "id": "q030",
+      "doc_id": 130,
+      "relevant_doc_ids": [
+        130
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        130,
+        202,
+        63,
+        35,
+        165,
+        107,
+        62,
+        87,
+        66,
+        152
+      ]
+    },
+    {
+      "id": "q031",
+      "doc_id": 71,
+      "relevant_doc_ids": [
+        71
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        71,
+        224,
+        203,
+        39,
+        209,
+        163,
+        26,
+        202,
+        67,
+        147
+      ]
+    },
+    {
+      "id": "q032",
+      "doc_id": 10,
+      "relevant_doc_ids": [
+        10
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        10,
+        187,
+        87,
+        226,
+        75,
+        165,
+        171,
+        191,
+        232,
+        1
+      ]
+    },
+    {
+      "id": "q033",
+      "doc_id": 116,
+      "relevant_doc_ids": [
+        116
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        116,
+        189,
+        223,
+        203,
+        210,
+        235,
+        212,
+        208,
+        211,
+        186
+      ]
+    },
+    {
+      "id": "q034",
+      "doc_id": 112,
+      "relevant_doc_ids": [
+        112
+      ],
+      "rank": 1,
+      "top_doc_ids": [
+        112,
+        226,
+        212,
+        224,
+        209,
+        162,
+        195,
+        235,
+        231,
+        165
+      ]
+    }
+  ]
+}

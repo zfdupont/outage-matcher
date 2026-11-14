@@ -12,6 +12,11 @@ NO_MATCH_FIX = (
 )
 
 
+# Start of the note added when a citation names a document that was not retrieved. The evals
+# count abstentions by this prefix, so keep the two in step by importing it.
+DROPPED_CITATION_NOTE = "dropped citation of a document that was not retrieved"
+
+
 class RetrievalError(RuntimeError):
     """Search could not run (database or embedding failure), so "no match" would be a lie."""
 
@@ -52,3 +57,5 @@ class AgentResult:
     usage: Usage
     retries: int
     events: list[dict[str, Any]]  # ordered trace of tool calls, grades, rewrites
+    # RetrievedChunks for the evals: the ones shown to the answerer first, then the rest
+    evidence: list[Any] = field(default_factory=list)

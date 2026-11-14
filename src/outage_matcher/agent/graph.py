@@ -8,6 +8,7 @@ from typing import Any, Literal, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from outage_matcher.agent.models import (
+    DROPPED_CITATION_NOTE,
     NO_MATCH_CAUSE,
     NO_MATCH_FIX,
     AgentAnswer,
@@ -49,9 +50,11 @@ REWRITE_SYSTEM = (
     "Call submit_query with the new query."
 )
 ANSWER_SYSTEM = (
-    "You are an SRE assistant. Using only the numbered excerpts, state the most likely cause of "
+    "You are an SRE assistant. Using only the excerpts, state the most likely cause of "
     "the incident and a suggested fix, and say so if the excerpts only partly cover it. "
-    "Cite the doc_id of every excerpt you relied on and no others. Call submit_answer."
+    "Each excerpt is labeled with its doc_id. Cite documents by that doc_id number (the value "
+    "after `doc_id=`) for every excerpt you relied on and no others; never cite by position. "
+    "Call submit_answer."
 )
 
 GRADE_TOOL = {
@@ -144,9 +147,19 @@ def _merge(existing: list[RetrievedChunk], new: list[RetrievedChunk]) -> list[Re
 
 
 def _excerpts(chunks: list[RetrievedChunk], limit: int) -> str:
+    """Excerpts numbered for the grader, which answers by position."""
     return "\n\n".join(
         f"[{i}] doc_id={c.doc_id} title={c.title!r} section={c.section_type}\n{c.text[:limit]}"
         for i, c in enumerate(chunks)
+    )
+
+
+def _answer_excerpts(chunks: list[RetrievedChunk], limit: int) -> str:
+    """Excerpts for the answerer, labeled only by doc_id: a bare position such as `[0]` was read
+    as a citation and the citation check then dropped it (most abstentions in the first evals)."""
+    return "\n\n".join(
+        f"doc_id={c.doc_id} | title={c.title!r} | section={c.section_type}\n{c.text[:limit]}"
+        for c in chunks
     )
 
 
@@ -313,7 +326,8 @@ class OutageAgent:
         relevant = state["relevant"][:MAX_ANSWER_CHUNKS]
         if not relevant:
             return {"answer": AgentAnswer(NO_MATCH_CAUSE, NO_MATCH_FIX, no_match=True)}
-        prompt = f"Incident: {state['question']}\n\nExcerpts:\n{_excerpts(relevant, ANSWER_CHARS)}"
+        excerpts = _answer_excerpts(relevant, ANSWER_CHARS)
+        prompt = f"Incident: {state['question']}\n\nExcerpts:\n{excerpts}"
         data, usage = self._forced(state["usage"], ANSWER_SYSTEM, ANSWER_TOOL, prompt, 1500)
         answer = self._validated_answer(data, state["retrieved"], relevant)
         return {"answer": answer, "usage": usage}
@@ -345,7 +359,7 @@ class OutageAgent:
                 continue
             chunk = by_doc[value]
             citations.append(Citation(chunk.doc_id, chunk.title, chunk.url, chunk.section_type))
-        notes = [f"dropped citation of a document that was not retrieved: {d!r}" for d in dropped]
+        notes = [f"{DROPPED_CITATION_NOTE}: {d!r}" for d in dropped]
         cause, fix = data.get("likely_cause"), data.get("suggested_fix")
         if not citations or not isinstance(cause, str) or not isinstance(fix, str):
             notes.append("answer had no valid citations or text; returning no match")
@@ -385,4 +399,8 @@ class OutageAgent:
         final = self.graph.invoke(state, {"recursion_limit": limit})
         answer = final["answer"]
         assert answer is not None
-        return AgentResult(question, answer, final["usage"], final["retries"], final["events"])
+        # Evidence for the evals: the excerpts the answerer saw first, then everything else.
+        evidence = _merge(final["relevant"][:MAX_ANSWER_CHUNKS], final["retrieved"])
+        return AgentResult(
+            question, answer, final["usage"], final["retries"], final["events"], evidence
+        )

@@ -10,7 +10,7 @@ from fakes import (
 )
 from outage_matcher.agent import tools
 from outage_matcher.agent.graph import OutageAgent
-from outage_matcher.agent.models import NO_MATCH_CAUSE, RetrievalError
+from outage_matcher.agent.models import DROPPED_CITATION_NOTE, NO_MATCH_CAUSE, RetrievalError
 from outage_matcher.agent.tools import ToolContext
 from outage_matcher.config import AgentConfig
 
@@ -349,3 +349,55 @@ def test_non_empty_text_blocks_are_echoed(search_log):
     make_agent(client, max_retries=0).ask(QUESTION)
     echoed = client.calls_for("retrieve")[1]["messages"][1]["content"]
     assert [b["type"] for b in echoed] == ["text", "tool_use"]
+
+
+def test_result_carries_every_retrieved_chunk_as_evidence(search_log):
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True, False)],
+        submit_answer=[answer([1])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert sorted(c.doc_id for c in result.evidence) == [1, 2]
+    assert result.evidence[0].text == "text of doc 1"
+
+
+def test_evidence_lists_the_chunks_the_answerer_saw_before_the_rest(search_log):
+    # the grader accepts only doc 2, which was retrieved second
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(False, True)],
+        submit_answer=[answer([2])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert [c.doc_id for c in result.evidence] == [2, 1]
+
+
+def test_answer_excerpts_are_labeled_by_doc_id_only_while_the_grader_keeps_positions(search_log):
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True, True)],
+        submit_answer=[answer([1])],
+    )
+    make_agent(client).ask(QUESTION)
+    grade_prompt = client.calls_for("submit_grades")[0]["messages"][0]["content"]
+    answer_prompt = client.calls_for("submit_answer")[0]["messages"][0]["content"]
+    assert "[0] doc_id=1" in grade_prompt and "[1] doc_id=2" in grade_prompt
+    assert "doc_id=1 |" in answer_prompt and "doc_id=2 |" in answer_prompt
+    assert "[0]" not in answer_prompt and "[1]" not in answer_prompt
+    system = client.calls_for("submit_answer")[0]["system"]
+    assert "never cite by position" in system
+
+
+def test_citing_an_excerpt_position_instead_of_a_doc_id_is_dropped_and_abstains(search_log):
+    """The failure seen in the first faithfulness run: the model answered with excerpt numbers
+    (0 and 1) while the doc ids were 1 and 2. Position 0 is no document, so the citation check
+    drops it; the agent must not accept it as a citation of some other document."""
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True, True)],
+        submit_answer=[answer([0])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert result.answer.no_match and result.answer.citations == []
+    assert any(n.startswith(DROPPED_CITATION_NOTE) and "0" in n for n in result.answer.notes)

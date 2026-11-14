@@ -1,0 +1,2947 @@
+{
+  "run": "faithfulness",
+  "date": "2026-11-13",
+  "config": {
+    "agent_model": "claude-haiku-5-5",
+    "agent_max_retries": 2,
+    "agent_retrieval": "pgvector search, bge embeddings, held-out chunks hidden per query",
+    "judge_model": "deepseek-flash",
+    "judge_temperature": 0.0,
+    "judge_prompt": {
+      "system": "You are a strict fact-checker for an incident-diagnosis assistant. Always answer with a single JSON object.",
+      "user_template": "Below are the cited excerpts from public outage postmortems and an answer that cites them.\n\nCited excerpts:\n{excerpts}\n\nAnswer to check:\nLikely cause: {likely_cause}\nSuggested fix: {suggested_fix}\n\nTask:\n1. Split the answer into atomic factual claims about what happened, what caused it or what to do.\n2. For each claim decide whether the cited excerpts support it. A claim is supported only if an excerpt states it or clearly implies it. Generic advice that no excerpt mentions is not supported. Do not use outside knowledge.\n\nReturn JSON: {\"claims\": [{\"claim\": \"<the claim>\", \"supported\": true or false, \"reason\": \"<short quote or explanation>\"}]}",
+      "evidence": "retrieved chunks of cited documents, 3000 characters per chunk"
+    },
+    "note": "judge is a different model family from the agent"
+  },
+  "index": {
+    "version": "34c67d0bba77",
+    "documents": 235,
+    "chunks": 4482
+  },
+  "gold": {
+    "path": "evals/gold.jsonl",
+    "sha256": "23e49b91b78f1362ee1b1242ba8ecd186cc54ae4ebb4f8c9afe4ed95a1d8c1ea",
+    "queries": 34,
+    "generation": {
+      "model": "deepseek-flash",
+      "temperature": 0.2,
+      "date": "2026-11-13",
+      "seed": 0
+    }
+  },
+  "code_commit": "3944e68",
+  "metrics": {
+    "queries": 34,
+    "answered_and_judged": 27,
+    "no_match": 7,
+    "errors": 0,
+    "claims": 336,
+    "claims_supported": 239,
+    "claim_support_rate": 0.7113095238095238,
+    "faithful_answer_rate": 0.037037037037037035
+  },
+  "tokens": {
+    "agent": {
+      "input_tokens": 376959,
+      "output_tokens": 34754,
+      "calls": 166
+    },
+    "judge": {
+      "input_tokens": 22753,
+      "output_tokens": 17458,
+      "calls": 27
+    }
+  },
+  "per_query": [
+    {
+      "id": "q001",
+      "query": "DNS lookups failing for domains that point to an origin via an alias record rather than a direct address; errors seen across multiple regions, affecting a small share of queries and requests, lasting roughly an hour and a half.",
+      "doc_id": 27,
+      "no_match": false,
+      "likely_cause": "Most likely a missing or deleted DNS record on the origin-side serving path. In the GitHub April 2026 report, lookups for GitHub Pages domains failed once the DNS record they depended on was missing; the team traced it to the missing record and re-created it, and says an automated process may have deleted DNS records it did not own, with a gap in alerting that delayed detection by about 53 minutes. This matches the symptom of alias-record lookups failing across regions for roughly 40 minutes of impact. Note that the excerpts describe this as a 39-minute incident, while the reported symptom lasted about an hour and a half, so the excerpts only partly cover the reported duration and do not confirm the exact record involved. The 1.1.1.1 CNAME-ordering incident (doc 12) is a different failure mode: resolver-side record order changes broke some clients, and it is not a match for a missing origin record, though it shows how CNAME handling can break resolution.",
+      "suggested_fix": "Re-create the missing DNS record for the affected origin and verify alias resolution across regions. Add safeguards that prevent automated tooling from deleting DNS records owned by other systems, and add monitoring and alerting for DNS resolution failures on the serving path to shorten detection time. Consider availability-zone-tolerant failover so that an unresolvable backend host fails over to healthy hosts instead of returning errors. If the symptoms match the CNAME-ordering pattern instead, check resolver behavior and record ordering in DNS responses.",
+      "cited_doc_ids": [
+        165,
+        12
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        12,
+        165,
+        195,
+        226,
+        232
+      ],
+      "agent_usage": {
+        "input_tokens": 13091,
+        "output_tokens": 1375,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The likely cause is a missing or deleted DNS record on the origin-side serving path.",
+          "supported": true,
+          "reason": "Doc 165: 'traced it to the missing DNS record and re-created it'; 'automated deletion of DNS records owned by other systems'."
+        },
+        {
+          "claim": "In the GitHub April 2026 report, lookups for GitHub Pages domains failed once the DNS record they depended on was missing.",
+          "supported": true,
+          "reason": "Doc 165: 'missing DNS record' and 'DNS resolution failures in the GitHub Pages serving path'."
+        },
+        {
+          "claim": "The GitHub team traced the issue to the missing record and re-created it.",
+          "supported": true,
+          "reason": "Doc 165: 'our team quickly traced it to the missing DNS record and re-created it'."
+        },
+        {
+          "claim": "GitHub says an automated process may have deleted DNS records it did not own.",
+          "supported": true,
+          "reason": "Doc 165: 'adding safeguards to prevent automated deletion of DNS records owned by other systems'."
+        },
+        {
+          "claim": "A gap in alerting delayed detection by about 53 minutes.",
+          "supported": true,
+          "reason": "Doc 165: 'detection took longer than we would have liked\u2014approximately 53 minutes\u2014due to ... a gap in our alerting'."
+        },
+        {
+          "claim": "This matches the symptom of alias-record lookups failing across regions for roughly 40 minutes of impact.",
+          "supported": false,
+          "reason": "Excerpts mention DNS resolution failures but not 'alias-record lookups' or 'across regions'; doc 165 says 39 minutes, not ~40, and no regional scope is stated."
+        },
+        {
+          "claim": "The excerpts describe this as a 39-minute incident.",
+          "supported": true,
+          "reason": "Doc 165: 'April 13 19:56 UTC (lasting 39 minutes)'."
+        },
+        {
+          "claim": "The reported symptom lasted about an hour and a half, so the excerpts only partly cover the reported duration.",
+          "supported": false,
+          "reason": "No excerpt states a ~90-minute symptom duration; this is outside the cited material."
+        },
+        {
+          "claim": "The excerpts do not confirm the exact record involved.",
+          "supported": true,
+          "reason": "Doc 165 only says 'the missing DNS record' without specifying which record."
+        },
+        {
+          "claim": "The 1.1.1.1 CNAME-ordering incident is a different failure mode: resolver-side record order changes broke some clients.",
+          "supported": true,
+          "reason": "Doc 12: 'a subtle shift in the order of records within our DNS responses' and 'some implementations expect CNAME records to appear before everything else'."
+        },
+        {
+          "claim": "The CNAME-ordering incident is not a match for a missing origin record.",
+          "supported": true,
+          "reason": "Doc 12 attributes failures to record ordering, not a missing record."
+        },
+        {
+          "claim": "The CNAME-ordering incident shows how CNAME handling can break resolution.",
+          "supported": true,
+          "reason": "Doc 12: 'When that order changed, resolution started failing'."
+        },
+        {
+          "claim": "Suggested fix: re-create the missing DNS record for the affected origin and verify alias resolution across regions.",
+          "supported": false,
+          "reason": "Doc 165 supports re-creating the record, but no excerpt mentions verifying 'alias resolution across regions'."
+        },
+        {
+          "claim": "Suggested fix: add safeguards that prevent automated tooling from deleting DNS records owned by other systems.",
+          "supported": true,
+          "reason": "Doc 165: 'adding safeguards to prevent automated deletion of DNS records owned by other systems'."
+        },
+        {
+          "claim": "Suggested fix: add monitoring and alerting for DNS resolution failures on the serving path to shorten detection time.",
+          "supported": true,
+          "reason": "Doc 165: 'improving logging and alerting for DNS resolution failures in the GitHub Pages serving path'."
+        },
+        {
+          "claim": "Suggested fix: consider availability-zone-tolerant failover so an unresolvable backend host fails over to healthy hosts instead of returning errors.",
+          "supported": true,
+          "reason": "Doc 165: 'implementing availability-zone-tolerant routing ... so that an unresolvable backend host triggers failover to healthy hosts rather than returning errors'."
+        },
+        {
+          "claim": "If symptoms match the CNAME-ordering pattern instead, check resolver behavior and record ordering in DNS responses.",
+          "supported": true,
+          "reason": "Doc 12 describes resolver-side record ordering causing resolution failures, implying this check."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1626,
+        "output_tokens": 957,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 4589
+    },
+    {
+      "id": "q002",
+      "query": "Seeing a spike in failed lookups from our DNS resolvers, roughly 12% above normal, with clients getting error responses instead of answers. Started around 07:00 UTC and lasted about four hours, concentrated in a few large data centers. Anyone else seeing this?",
+      "doc_id": 1,
+      "no_match": false,
+      "likely_cause": "Expired DNSSEC signatures in the root zone. The root zone version from 21 September had signatures expire at 07:00 UTC on 4 October 2023. No newer root zone version was available to the resolver systems, so resolvers that could not validate DNSSEC began returning SERVFAIL responses. This matches the 12% rise in SERVFAIL rate, the 07:00 UTC start, and the concentration in large data centers. The excerpts describe a similar public incident (1.1.1.1, October 4, 2023) and do not cover your specific environment, so confirm that your resolvers' root trust anchor and root zone data are the cause before acting.",
+      "suggested_fix": "Check whether your resolvers hold a root zone with expired DNSSEC signatures and whether a newer root zone is available to them. Obtain and load a current root zone version so signatures validate again. Then monitor SERVFAIL rates to confirm recovery. Going forward, alert on root zone signature expiry and on failed or stale root zone updates so resolvers do not run on an expired zone. The excerpts do not give a full remediation procedure, so verify the exact steps against your resolver software's documentation.",
+      "cited_doc_ids": [
+        1
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        1,
+        226
+      ],
+      "agent_usage": {
+        "input_tokens": 7411,
+        "output_tokens": 1055,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The likely cause was expired DNSSEC signatures in the root zone.",
+          "supported": true,
+          "reason": "Doc 1: 'the DNSSEC signatures in the version of the root zone from 21 September expired.'"
+        },
+        {
+          "claim": "The root zone version from 21 September had signatures that expired at 07:00 UTC on 4 October 2023.",
+          "supported": true,
+          "reason": "Doc 1: 'On 4 October 2023 at 07:00 UTC, the DNSSEC signatures in the version of the root zone from 21 September expired.'"
+        },
+        {
+          "claim": "No newer root zone version was available to the resolver systems.",
+          "supported": true,
+          "reason": "Doc 1: 'Because there was no newer version that the Cloudflare resolver systems were able to use...'"
+        },
+        {
+          "claim": "Resolvers that could not validate DNSSEC began returning SERVFAIL responses.",
+          "supported": true,
+          "reason": "Doc 1: 'some of Cloudflare's resolver systems stopped being able to validate DNSSEC signatures and as a result started sending error responses (SERVFAIL).'"
+        },
+        {
+          "claim": "This matches a 12% rise in SERVFAIL rate.",
+          "supported": true,
+          "reason": "Doc 1: 'The rate at which Cloudflare resolvers generated SERVFAIL responses grew by 12%.'"
+        },
+        {
+          "claim": "This matches the 07:00 UTC start.",
+          "supported": true,
+          "reason": "Doc 1: 'starting at 07:00 UTC' and signatures expired 'at 07:00 UTC'."
+        },
+        {
+          "claim": "The impact was concentrated in large data centers.",
+          "supported": true,
+          "reason": "Doc 1: 'mainly concentrated in our larger data centers like Ashburn, Virginia; Frankfurt, Germany; and Singapore.'"
+        },
+        {
+          "claim": "The excerpts describe a similar public incident (1.1.1.1, October 4, 2023) and do not cover the user's specific environment.",
+          "supported": true,
+          "reason": "Doc 1 is titled '1.1.1.1 lookup failures on October 4, 2023' and describes Cloudflare's incident, not the user's environment."
+        },
+        {
+          "claim": "One should confirm that the resolvers' root trust anchor and root zone data are the cause before acting.",
+          "supported": false,
+          "reason": "Generic advice; no excerpt mentions root trust anchors or instructs confirming cause before acting."
+        },
+        {
+          "claim": "Check whether your resolvers hold a root zone with expired DNSSEC signatures and whether a newer root zone is available to them.",
+          "supported": false,
+          "reason": "Generic remediation advice not stated in the excerpts."
+        },
+        {
+          "claim": "Obtain and load a current root zone version so signatures validate again.",
+          "supported": false,
+          "reason": "No excerpt describes this remediation step."
+        },
+        {
+          "claim": "Monitor SERVFAIL rates to confirm recovery.",
+          "supported": false,
+          "reason": "Generic advice; excerpts mention SERVFAIL rates but not monitoring to confirm recovery."
+        },
+        {
+          "claim": "Alert on root zone signature expiry and on failed or stale root zone updates going forward.",
+          "supported": false,
+          "reason": "No excerpt mentions alerting or preventive measures."
+        },
+        {
+          "claim": "The excerpts do not give a full remediation procedure, so verify exact steps against resolver software documentation.",
+          "supported": false,
+          "reason": "Generic advice; excerpts contain no remediation procedure or documentation guidance."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 878,
+        "output_tokens": 736,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1669
+    },
+    {
+      "id": "q003",
+      "query": "Multiple regions across all services went down at once: web UI and APIs unreachable, monitoring stopped alerting, and data ingestion stalled. Recovery took hours, with full data backfill stretching into following days. Anyone seen similar simultaneous multi-region platform-wide failures?",
+      "doc_id": 117,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 2,
+      "answer_notes": [],
+      "graded_relevant": 0,
+      "retrieved_doc_ids": [
+        2,
+        75,
+        145,
+        147,
+        153,
+        165,
+        209
+      ],
+      "agent_usage": {
+        "input_tokens": 28164,
+        "output_tokens": 1772,
+        "llm_calls": 12
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q004",
+      "query": "All scoreboards and their associated data disappeared at once, and the site was put into maintenance mode while we tried to recover. After coming back online, roughly seven hours of newly created scoreboards and added scores were permanently missing.",
+      "doc_id": 89,
+      "no_match": false,
+      "likely_cause": "A database-reset function (one that drops the local database and recreates all tables from scratch) was run while connected to the production database, wiping all scoreboards and scores. The excerpts say the function connected to production and wiped it, but do not establish why it targeted production; the authors say they are still investigating that. Recovery used the once-daily managed backup, so roughly seven hours of data created between 15:47 and 23:21 CET on 17 October 2020 were lost permanently.",
+      "suggested_fix": "Restore from the most recent backup, but recognize that the gap since the last daily backup cannot be recovered from these excerpts. Remove or guard the destructive reset function so it cannot run against production, for example by requiring an explicit local-only environment check and refusing to run when the connection points at a production host. Use separate credentials for production that a developer's local tooling cannot reach. Increase backup frequency (for example point-in-time recovery) so that the data-loss window is much smaller than one day. The excerpts do not describe these specific guardrails, so they are recommendations rather than documented fixes.",
+      "cited_doc_ids": [
+        89
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        89,
+        113,
+        233
+      ],
+      "agent_usage": {
+        "input_tokens": 6889,
+        "output_tokens": 723,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "A database-reset function that drops the local database and recreates all tables from scratch was run while connected to the production database.",
+          "supported": true,
+          "reason": "Excerpt: 'It's a function that deletes the local database and creates all the required tables from scratch. This evening... the function connected to the production database and wiped it.'"
+        },
+        {
+          "claim": "The function wiped all scoreboards and scores.",
+          "supported": true,
+          "reason": "Excerpt: 'Over 300.00 scoreboards and their associated data were vaporised in an instant.'"
+        },
+        {
+          "claim": "The excerpts do not establish why the function targeted production; the authors say they are still investigating.",
+          "supported": true,
+          "reason": "Excerpt: 'Why? This is something we're still trying to figure out.'"
+        },
+        {
+          "claim": "Recovery used the once-daily managed backup.",
+          "supported": true,
+          "reason": "Excerpt: 'DigitalOcean automatically do backups once a day... we took the website into maintenance mode and worked on restoring a backup.'"
+        },
+        {
+          "claim": "Roughly seven hours of data created between 15:47 and 23:21 CET on 17 October 2020 were lost permanently.",
+          "supported": true,
+          "reason": "Excerpt: '7 hours of scoreboard data was gone forever... any scoreboards created or scores added on the 17th October 2020 between 15:47 CET and 23:21 CET have been lost.'"
+        },
+        {
+          "claim": "The suggested fix is to restore from the most recent backup, recognizing the gap since the last daily backup cannot be recovered from these excerpts.",
+          "supported": true,
+          "reason": "Excerpt confirms backup restore and that 7 hours of data was 'gone forever'; the excerpts do not describe recovering that gap."
+        },
+        {
+          "claim": "Remove or guard the destructive reset function so it cannot run against production, e.g., requiring an explicit local-only environment check and refusing to run when the connection points at a production host.",
+          "supported": false,
+          "reason": "No excerpt describes this guardrail; it is generic advice not mentioned in the excerpts."
+        },
+        {
+          "claim": "Use separate credentials for production that a developer's local tooling cannot reach.",
+          "supported": false,
+          "reason": "No excerpt mentions separate credentials or credential isolation."
+        },
+        {
+          "claim": "Increase backup frequency (for example point-in-time recovery) so the data-loss window is much smaller than one day.",
+          "supported": false,
+          "reason": "No excerpt mentions increasing backup frequency or point-in-time recovery; the excerpts only note once-daily backups."
+        },
+        {
+          "claim": "The excerpts do not describe these specific guardrails, so they are recommendations rather than documented fixes.",
+          "supported": true,
+          "reason": "The excerpts contain no mention of environment checks, separate credentials, or increased backup frequency."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 714,
+        "output_tokens": 600,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1217
+    },
+    {
+      "id": "q005",
+      "query": "Some free tier databases came back missing their most recent writes, and data from other databases appeared in them. Affected instances were a small fraction of the fleet; the issue was reported and resolved within about an hour.",
+      "doc_id": 42,
+      "no_match": false,
+      "likely_cause": "A change deployed November 20th made it possible for an empty backup identifier to be used. On December 1st, internal procedures restored databases from those backups, and 0.07% of databases under management were incorrectly configured with an empty backup identifier. This caused the data leak (other databases' data appearing), and the conservative fix applied to stop the leak led to possible loss of the most recent writes. The excerpts describe this at a summary level; they do not detail the exact code path or the specific misconfiguration mechanism.",
+      "suggested_fix": "Prevent empty backup identifiers from being accepted or used: validate that backup identifiers are non-empty and correctly scoped to a single database before any restore or recreate operation, and audit/correct the affected database configurations. Add a guard in the internal recreate procedures so they refuse to restore from a backup with an empty identifier. The excerpts do not specify recovery steps for the lost most recent writes, so that remains to be determined from the full postmortem.",
+      "cited_doc_ids": [
+        42
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        42,
+        53,
+        167,
+        202
+      ],
+      "agent_usage": {
+        "input_tokens": 6575,
+        "output_tokens": 694,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "A change deployed on November 20th made it possible for an empty backup identifier to be used.",
+          "supported": true,
+          "reason": "Excerpt: 'A change that made possible for the empty backup identifier to be used was made to the system on November 20th.'"
+        },
+        {
+          "claim": "On December 1st, internal procedures restored databases from those backups.",
+          "supported": true,
+          "reason": "Excerpt: 'On December 1st, internal procedures led to those backups being used to recreate the databases.'"
+        },
+        {
+          "claim": "0.07% of databases under management were incorrectly configured with an empty backup identifier.",
+          "supported": true,
+          "reason": "Excerpt: '0.07% of databases under management were incorrectly configured with an empty backup identifier.'"
+        },
+        {
+          "claim": "This caused a data leak.",
+          "supported": true,
+          "reason": "Excerpt: 'which caused a data leak.'"
+        },
+        {
+          "claim": "The data leak involved other databases' data appearing.",
+          "supported": false,
+          "reason": "Excerpts only say 'data leak'; the specific form (other databases' data appearing) is not stated."
+        },
+        {
+          "claim": "The conservative fix applied to stop the leak led to possible loss of the most recent writes.",
+          "supported": true,
+          "reason": "Excerpt: 'The conservative fix we applied to the leak, lead to the possible loss of the most recent data in those databases.'"
+        },
+        {
+          "claim": "The excerpts describe this at a summary level and do not detail the exact code path or specific misconfiguration mechanism.",
+          "supported": true,
+          "reason": "Excerpts are labeled '(section summary)' and give no code path or mechanism details."
+        },
+        {
+          "claim": "Backup identifiers should be validated to be non-empty and correctly scoped to a single database before any restore or recreate operation.",
+          "supported": false,
+          "reason": "No excerpt mentions validation or scoping of backup identifiers; this is generic advice."
+        },
+        {
+          "claim": "Affected database configurations should be audited and corrected.",
+          "supported": false,
+          "reason": "No excerpt mentions auditing or correcting configurations; generic advice."
+        },
+        {
+          "claim": "A guard should be added in internal recreate procedures so they refuse to restore from a backup with an empty identifier.",
+          "supported": false,
+          "reason": "No excerpt mentions adding such a guard; generic advice."
+        },
+        {
+          "claim": "The excerpts do not specify recovery steps for the lost most recent writes.",
+          "supported": true,
+          "reason": "Excerpts only mention 'possible loss of the most recent data'; no recovery steps are given."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 605,
+        "output_tokens": 546,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 702
+    },
+    {
+      "id": "q006",
+      "query": "Global outage: all sites behind our edge returning 502 errors to visitors for about 27 minutes, while our own dashboard and internal tools were also unreachable during the same window. Traffic to every customer domain failed at once, worldwide.",
+      "doc_id": 22,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [
+        "answer had no valid citations or text; returning no match"
+      ],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        2,
+        22,
+        66,
+        120,
+        147
+      ],
+      "agent_usage": {
+        "input_tokens": 7016,
+        "output_tokens": 1000,
+        "llm_calls": 4
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q007",
+      "query": "Seeing a spike in 500-level errors and very high latency across object and directory operations, roughly a fifth to a quarter of all requests failing, lasting several hours. Only part of the traffic is affected; other requests succeed normally.",
+      "doc_id": 100,
+      "no_match": false,
+      "likely_cause": "Excerpts only partly cover the cause. Doc 100 documents the impact: starting around 10:30 UTC, about 22% of all PUT, GET, and DELETE requests for objects and directories returned 500-level errors, peaking near 27%, with very high latency, lasting until about 20:45 UTC. The excerpt does not state the root cause. The fact that only a subset of requests failed in a fairly consistent proportion suggests a partial failure, such as a subset of backend nodes or shards being unhealthy, but the excerpts do not confirm this.",
+      "suggested_fix": "The excerpts do not give a verified fix. Check the postmortem's root-cause and remediation sections for the actual cause. As general next steps, identify which backend nodes or shards return 500s and high latency, remove or drain them from serving, and confirm that the error rate drops to zero. Also check for recent changes around 10:30 UTC.",
+      "cited_doc_ids": [
+        100
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        8,
+        100,
+        147,
+        203,
+        223
+      ],
+      "agent_usage": {
+        "input_tokens": 6956,
+        "output_tokens": 751,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "Doc 100 documents the impact of the outage.",
+          "supported": true,
+          "reason": "Doc 100 is titled 'Postmortem for July 27 outage of the Manta service' with section 'impact' describing error rates."
+        },
+        {
+          "claim": "Starting around 10:30 UTC, the Manta service began serving a high percentage of error responses.",
+          "supported": true,
+          "reason": "'Around 10:30 UTC ... the Manta service started serving a high percentage of error responses.'"
+        },
+        {
+          "claim": "About 22% of all PUT, GET, and DELETE requests for objects and directories returned 500-level errors.",
+          "supported": true,
+          "reason": "'received 500-level errors in response to about 22% of all types of requests, including PUT, GET, and DELETE for both objects and directories.'"
+        },
+        {
+          "claim": "The error rate peaked near 27%.",
+          "supported": true,
+          "reason": "'At peak, the error rate approached 27% of all requests.'"
+        },
+        {
+          "claim": "Clients experienced very high latency.",
+          "supported": true,
+          "reason": "'Clients experienced very high latency.'"
+        },
+        {
+          "claim": "The event lasted until about 20:45 UTC.",
+          "supported": true,
+          "reason": "'This lasted until about 20:45 UTC ... By 20:45 UTC, the error rate returned back to zero.'"
+        },
+        {
+          "claim": "The excerpt does not state the root cause.",
+          "supported": true,
+          "reason": "The excerpt only covers the impact section; no cause is given."
+        },
+        {
+          "claim": "Only a subset of requests failed in a fairly consistent proportion, suggesting a partial failure such as unhealthy backend nodes or shards.",
+          "supported": false,
+          "reason": "This is inference not stated in the excerpt; the excerpt gives error percentages but does not attribute them to backend nodes or shards."
+        },
+        {
+          "claim": "The excerpts do not give a verified fix.",
+          "supported": true,
+          "reason": "The excerpt contains only the impact section, no remediation."
+        },
+        {
+          "claim": "Check the postmortem's root-cause and remediation sections for the actual cause.",
+          "supported": false,
+          "reason": "Generic advice not mentioned in the excerpt."
+        },
+        {
+          "claim": "Identify which backend nodes or shards return 500s and high latency, remove or drain them from serving, and confirm the error rate drops to zero.",
+          "supported": false,
+          "reason": "Generic remediation advice not mentioned in the excerpt."
+        },
+        {
+          "claim": "Check for recent changes around 10:30 UTC.",
+          "supported": false,
+          "reason": "Generic advice not mentioned in the excerpt."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 529,
+        "output_tokens": 556,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 556
+    },
+    {
+      "id": "q008",
+      "query": "Seeing a big spike in database connection timeouts, with new connections opening in the hundreds per second and fluctuating wildly. Cache calls are also intermittently timing out, and later we started getting read i/o timeouts too. Anyone seen this?",
+      "doc_id": 62,
+      "no_match": false,
+      "likely_cause": "Connection pooling problem causing hundreds of new database connections per second, which fluctuated sharply. Per the postmortem excerpts, the DB timeouts were mostly fixed by fixing connection pooling, and the cache timeouts were mostly fixed by raising the cache connection pool size from 2 to 20, which cut the number of new connections needed. A runaway query also spawned thousands of goroutines that opened connections to fetch data from external providers, which made things worse. The excerpts do not state the exact root cause of the pooling defect, and they do not describe the read I/O timeouts you mentioned, so that part is only partly covered. The earlier race-condition theory (connections expiring and goroutines reusing a dead connection) was a hypothesis, not a confirmed cause.",
+      "suggested_fix": "Fix connection pooling so new connections are not opened in the hundreds per second. Increase the cache connection pool size (the postmortem raised it from 2 to 20). Limit concurrency for parallel external requests and guard against runaway queries that spawn thousands of goroutines. The excerpts also mention doubling the max connection lifespan from 15m to 30m as a tried mitigation, but do not confirm its effect. Check whether the read I/O timeouts share this cause, since the excerpts do not cover them.",
+      "cited_doc_ids": [
+        62
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        62,
+        63,
+        100,
+        162,
+        202,
+        212,
+        226
+      ],
+      "agent_usage": {
+        "input_tokens": 12582,
+        "output_tokens": 1318,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The trigger was a larger-than-normal number of Postgres connection timeouts.",
+          "supported": true,
+          "reason": "Excerpt: 'The trigger for this incident was a larger-than-normal number of Postgres connection timeouts.'"
+        },
+        {
+          "claim": "New connections were being opened in the hundreds per second, spiking up and down.",
+          "supported": true,
+          "reason": "Excerpt: 'the number of new connections being opened per second, it was in the hundreds, spiking up and down like crazy.'"
+        },
+        {
+          "claim": "The DB timeouts were mostly fixed by fixing connection pooling so it wasn't opening hundreds of connections per second.",
+          "supported": true,
+          "reason": "Excerpt: 'We mostly fixed the DB timeouts by fixing our connection pooling, so that it wasn't opening hundreds of connections per second.'"
+        },
+        {
+          "claim": "The cache timeouts were mostly fixed by increasing the cache connection pool size from 2 to 20.",
+          "supported": true,
+          "reason": "Excerpt: 'We mostly fixed the cache timeouts by increasing the connection pool size from 2 to 20.'"
+        },
+        {
+          "claim": "Increasing the cache connection pool size reduced the number of new connections needed.",
+          "supported": true,
+          "reason": "Excerpt: 'therefore massively reducing the number of new connections which need to be opened.'"
+        },
+        {
+          "claim": "A runaway query spawned thousands of goroutines that opened connections to fetch data from external providers, making things worse.",
+          "supported": true,
+          "reason": "Excerpt: 'The runaway query incident made things worse by spawning thousands of goroutines, which opened connections to fetch data from external providers.'"
+        },
+        {
+          "claim": "The excerpts do not state the exact root cause of the pooling defect.",
+          "supported": true,
+          "reason": "Excerpts describe symptoms and mitigations but no confirmed root cause of the pooling defect."
+        },
+        {
+          "claim": "The excerpts do not describe read I/O timeouts.",
+          "supported": true,
+          "reason": "Excerpts discuss connection and cache timeouts, not read I/O timeouts."
+        },
+        {
+          "claim": "The race-condition theory (connections expiring and goroutines reusing a dead connection) was a hypothesis, not a confirmed cause.",
+          "supported": true,
+          "reason": "Excerpt: 'One of those was that there was potentially a race condition...' framed as an initial theory."
+        },
+        {
+          "claim": "Fix connection pooling so new connections are not opened in the hundreds per second.",
+          "supported": true,
+          "reason": "Excerpt: 'We mostly fixed the DB timeouts by fixing our connection pooling, so that it wasn't opening hundreds of connections per second.'"
+        },
+        {
+          "claim": "Increase the cache connection pool size (the postmortem raised it from 2 to 20).",
+          "supported": true,
+          "reason": "Excerpt: 'increasing the connection pool size from 2 to 20.'"
+        },
+        {
+          "claim": "Limit concurrency for parallel external requests.",
+          "supported": true,
+          "reason": "Excerpt notes problems persisted 'when making lots of external requests in parallel,' implying limiting concurrency, though not stated as a fix."
+        },
+        {
+          "claim": "Guard against runaway queries that spawn thousands of goroutines.",
+          "supported": true,
+          "reason": "Excerpt: 'The runaway query incident made things worse by spawning thousands of goroutines.'"
+        },
+        {
+          "claim": "Doubling the max connection lifespan from 15m to 30m was a tried mitigation, but its effect is not confirmed.",
+          "supported": true,
+          "reason": "Excerpt: 'We figured it was worth trying... Doubling the maximum connection lifespan from 15m to 30m'; no confirmed effect stated."
+        },
+        {
+          "claim": "Check whether the read I/O timeouts share this cause, since the excerpts do not cover them.",
+          "supported": true,
+          "reason": "Excerpts do not mention read I/O timeouts, so this is a reasonable caveat consistent with the excerpts."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 910,
+        "output_tokens": 831,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1853
+    },
+    {
+      "id": "q009",
+      "query": "Automated service-to-service authentication failing across multiple platform components, with API requests returning auth errors and control plane operations erroring out; lasted about two hours and affected a subset of accounts plus dependent services.",
+      "doc_id": 7,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [
+        "answer had no valid citations or text; returning no match"
+      ],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        7,
+        147,
+        172,
+        184,
+        200
+      ],
+      "agent_usage": {
+        "input_tokens": 7434,
+        "output_tokens": 824,
+        "llm_calls": 4
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q010",
+      "query": "Users unable to connect or load the app after restarting their client, getting an error page instead of the normal interface; connection attempts slow and failing for a period of hours, while already-connected users mostly kept working. Elevated request failures and timeouts on the session-startup path.",
+      "doc_id": 74,
+      "no_match": false,
+      "likely_cause": "The excerpts point to a failure in the authentication/session-startup path. Users who already had established sessions kept working while new logins and client restarts failed with error pages, which matches the pattern in the Cloudflare Access incident (doc 2): widespread authentication failures ending in error pages, with existing Access sessions unaffected and the cause resolved by a rollback. Doc 2 attributes its CDN latency and 5xx errors to observability systems consuming large amounts of CPU while auto-enhancing uncaught errors. The excerpts do not identify the root cause in this specific incident, so this is a pattern match rather than a confirmed diagnosis. Doc 84 describes a similar symptom (new connections failing while established ones keep working) but gives no cause.",
+      "suggested_fix": "Check for a recent configuration or code change on the authentication/session-startup path and roll it back, as was done in the Cloudflare case (doc 2). Also check whether error-handling or debugging instrumentation is consuming excessive CPU during failures, and reduce or disable that enhancement under error load. Confirm recovery by watching login success rates and session-startup timeouts. The excerpts do not provide direct evidence for this incident's root cause, so these steps need verification against this system's own logs and change history.",
+      "cited_doc_ids": [
+        2,
+        84
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        2,
+        59,
+        62,
+        84,
+        87
+      ],
+      "agent_usage": {
+        "input_tokens": 7070,
+        "output_tokens": 944,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The excerpts point to a failure in the authentication/session-startup path.",
+          "supported": false,
+          "reason": "The excerpts describe symptoms (authentication failures, connection issues) but do not identify an authentication/session-startup path failure as the cause; the answer itself later admits the root cause is not identified."
+        },
+        {
+          "claim": "Users who already had established sessions kept working while new logins and client restarts failed with error pages.",
+          "supported": true,
+          "reason": "Doc 2: 'Any existing Access sessions were unaffected. All failed authentication attempts resulted in an error page'; Doc 84: 'users who had already established connections could continue to work'."
+        },
+        {
+          "claim": "The Cloudflare Access incident (doc 2) involved widespread authentication failures ending in error pages.",
+          "supported": true,
+          "reason": "Doc 2: 'Authentication failures were widespread... All failed authentication attempts resulted in an error page'."
+        },
+        {
+          "claim": "In the Cloudflare incident, existing Access sessions were unaffected.",
+          "supported": true,
+          "reason": "Doc 2: 'Any existing Access sessions were unaffected.'"
+        },
+        {
+          "claim": "The Cloudflare incident was resolved by a rollback.",
+          "supported": true,
+          "reason": "Doc 2: 'continuing until the rollback was initiated at 13:05'."
+        },
+        {
+          "claim": "Doc 2 attributes its CDN latency and 5xx errors to observability systems consuming large amounts of CPU while auto-enhancing uncaught errors.",
+          "supported": true,
+          "reason": "Doc 2: 'returning HTTP 5xx errors... significant increases in latency... due to large amounts of CPU being consumed by our debugging and observability systems, which automatically enhance uncaught errors'."
+        },
+        {
+          "claim": "The excerpts do not identify the root cause in this specific incident.",
+          "supported": true,
+          "reason": "Neither excerpt states a root cause for the incident being diagnosed; doc 84 gives no cause."
+        },
+        {
+          "claim": "Doc 84 describes a similar symptom of new connections failing while established ones keep working.",
+          "supported": true,
+          "reason": "Doc 84: 'all users were locked out... (users who had already established connections could continue to work)'."
+        },
+        {
+          "claim": "Doc 84 gives no cause for its incident.",
+          "supported": true,
+          "reason": "Doc 84 excerpt describes symptoms and timing but no root cause."
+        },
+        {
+          "claim": "Suggested fix: check for a recent configuration or code change on the authentication/session-startup path and roll it back, as was done in the Cloudflare case.",
+          "supported": false,
+          "reason": "Doc 2 mentions a rollback but does not state it was of a configuration or code change on an authentication path; this is generic advice not stated in the excerpts."
+        },
+        {
+          "claim": "Check whether error-handling or debugging instrumentation is consuming excessive CPU during failures, and reduce or disable that enhancement under error load.",
+          "supported": false,
+          "reason": "Doc 2 describes observability systems consuming CPU, but no excerpt recommends checking or disabling such instrumentation; this is generic advice."
+        },
+        {
+          "claim": "Confirm recovery by watching login success rates and session-startup timeouts.",
+          "supported": false,
+          "reason": "No excerpt mentions monitoring login success rates or session-startup timeouts as a recovery check."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 825,
+        "output_tokens": 702,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1691
+    },
+    {
+      "id": "q011",
+      "query": "Seeing widespread failures across most of our status page services \u2014 reads of newly written data failing, pushes and pull request updates not reflecting, and some token-based workflows failing to launch. Roughly an hour of major impact, with some data staying inconsistent well after.",
+      "doc_id": 158,
+      "no_match": false,
+      "likely_cause": "The excerpts do not identify the cause of this specific incident. The symptoms (failed reads of newly written data, push and PR updates not reflecting, token-based workflows failing, inconsistent data after recovery) most closely match the database-layer failure described in doc_id=158: a database cluster serving git data crashed and automatic failover promoted the primary, but read replicas were not reattached. The primary could not handle full read/write load, so Git requests failed or were slow, and pull request push updates needed extra recovery work. doc_id=224 describes October write outages affecting pushes, PR updates, and API writes, with some services affected, but its stated cause is not in the excerpts. The match to this incident is therefore only partial and inferred.",
+      "suggested_fix": "Check whether read replicas are attached to the newly promoted primary after any database failover, and reattach them if not. Confirm the primary can handle full read/write load and that replication is caught up. Then verify that pull request push updates and derived data have been reconciled, since the excerpts note that recovery of these needed additional work. For the write-outage pattern in doc_id=224, the excerpts only mention that capacity growth should be paired with safer operations and validated regional recovery; no specific remediation is given. Confirm the root cause against your own incident timeline, since the excerpts do not contain it.",
+      "cited_doc_ids": [
+        158,
+        224
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        40,
+        158,
+        195,
+        209,
+        224
+      ],
+      "agent_usage": {
+        "input_tokens": 13258,
+        "output_tokens": 1145,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The excerpts do not identify the cause of this specific incident.",
+          "supported": true,
+          "reason": "The answer's own framing; excerpts describe other incidents (May 11, October 7) but no cause for the incident in question is given in the cited text."
+        },
+        {
+          "claim": "The symptoms include failed reads of newly written data, push and PR updates not reflecting, token-based workflows failing, and inconsistent data after recovery.",
+          "supported": false,
+          "reason": "No excerpt lists these symptoms; doc 224 mentions push/PR/API errors and doc 158 mentions failed/slow Git requests, but not failed reads of newly written data, token-based workflow failures, or inconsistent data after recovery."
+        },
+        {
+          "claim": "Doc 158 describes a database cluster serving git data that crashed, triggering an automated failover.",
+          "supported": true,
+          "reason": "doc 158: 'a database cluster serving git data crashed, triggering an automated failover.'"
+        },
+        {
+          "claim": "In doc 158, the failover promoted the primary but read replicas were not attached.",
+          "supported": true,
+          "reason": "doc 158: 'The failover of the primary was successful, but in this instance read replicas were not attached.'"
+        },
+        {
+          "claim": "In doc 158, the primary could not handle full read/write load, so Git requests failed or were slow.",
+          "supported": true,
+          "reason": "doc 158: 'The primary cannot handle full read/write load, so an average of 15% of requests for Git data were failed or slow.'"
+        },
+        {
+          "claim": "In doc 158, pull request push updates needed extra recovery work.",
+          "supported": true,
+          "reason": "doc 158: 'additional work was required to recover pull request push updates.'"
+        },
+        {
+          "claim": "Doc 224 describes October write outages affecting pushes, PR updates, and API writes.",
+          "supported": true,
+          "reason": "doc 224: 'Customers may have seen errors when pushing code, signing in, updating pull requests or issues, or making changes through the API.'"
+        },
+        {
+          "claim": "Doc 224's stated cause for the October write outages is not in the excerpts.",
+          "supported": false,
+          "reason": "doc 224 full_document states: 'The October 7 write outages exposed an unsafe interaction between database orchestration and production routing.'"
+        },
+        {
+          "claim": "The match between the incident and doc 158 is only partial and inferred.",
+          "supported": true,
+          "reason": "This is a hedged inference; the excerpts do not tie doc 158's May 11 incident to the incident in question."
+        },
+        {
+          "claim": "Check whether read replicas are attached to the newly promoted primary after any database failover, and reattach them if not.",
+          "supported": true,
+          "reason": "doc 158: 'We mitigated this by reattaching the read replicas and the core scenarios recovered.'"
+        },
+        {
+          "claim": "Confirm the primary can handle full read/write load and that replication is caught up.",
+          "supported": false,
+          "reason": "doc 158 notes the primary cannot handle full read/write load, but no excerpt mentions confirming replication is caught up."
+        },
+        {
+          "claim": "Verify that pull request push updates and derived data have been reconciled, since recovery of these needed additional work.",
+          "supported": false,
+          "reason": "doc 158 mentions additional work to recover pull request push updates, but 'derived data' reconciliation is not mentioned in any excerpt."
+        },
+        {
+          "claim": "For the write-outage pattern in doc 224, the excerpts only mention that capacity growth should be paired with safer operations and validated regional recovery.",
+          "supported": true,
+          "reason": "doc 224: 'reinforced the need for capacity growth to be paired with safer operations, stronger isolation, and validated regional recovery.'"
+        },
+        {
+          "claim": "No specific remediation is given for the doc 224 write-outage pattern.",
+          "supported": false,
+          "reason": "doc 224 states the cause was 'an unsafe interaction between database orchestration and production routing,' implying remediation, and the excerpts do not affirmatively state no remediation exists."
+        },
+        {
+          "claim": "The root cause should be confirmed against your own incident timeline, since the excerpts do not contain it.",
+          "supported": true,
+          "reason": "The excerpts describe other incidents and do not state the cause of the incident in question."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1443,
+        "output_tokens": 914,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 4490
+    },
+    {
+      "id": "q012",
+      "query": "Seeing intermittent failures creating database containers in one region, now spreading to a second region and failing on every attempt; requests that used to succeed are returning invalid-input errors. No changes on our side.",
+      "doc_id": 106,
+      "no_match": false,
+      "likely_cause": "The excerpts describe a different incident: a July 24, 2026 GitHub pull request creation outage. A backfill workflow into a Vitess keyspace hit errors and VReplication lag, and its cancellation ran a misunderstood Vitess codepath that dropped the backing table in the target keyspace. That left a non-existent table reference that broke pull request creation. The excerpt does not cover database container creation, invalid-input errors, or regional spread, so it is only a partial match for the reported symptoms. The shared pattern is a schema or backing-table change in the data layer causing create operations to fail, but I cannot confirm that as the cause of the current incident.",
+      "suggested_fix": "Check whether any schema, migration, or backfill job ran in the affected regions around the time failures began, even though you report no changes on your side. Verify that the backing tables or references used by container creation still exist in each region's database, and compare the failing region's schema against a healthy one. If a backfill or cancellation is involved, check for dropped tables and restore them from backup or recreate them before retrying. Confirm the rollout is halted in the second region so the failure does not spread further. The excerpts give no direct remediation for database container creation, so these steps are a general approach rather than a documented fix.",
+      "cited_doc_ids": [
+        195
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        109,
+        147,
+        149,
+        163,
+        167,
+        173,
+        195,
+        207
+      ],
+      "agent_usage": {
+        "input_tokens": 13063,
+        "output_tokens": 1067,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The excerpts describe a July 24, 2026 GitHub pull request creation outage.",
+          "supported": true,
+          "reason": "Excerpt: 'On July 24, 2026, between 19:17 and 20:02 UTC, users were unable to create pull requests...'"
+        },
+        {
+          "claim": "A backfill workflow into a Vitess keyspace hit errors and increased VReplication lag.",
+          "supported": true,
+          "reason": "Excerpt: 'The backfill Vitess command encountered errors and increased VReplication lag'"
+        },
+        {
+          "claim": "The cancellation of the backfill workflow ran a misunderstood Vitess codepath that dropped the backing table in the target keyspace.",
+          "supported": true,
+          "reason": "Excerpt: 'The cancellation executed a misunderstood Vitess codepath that dropped the backing table to the target keyspace'"
+        },
+        {
+          "claim": "The dropped backing table left a non-existent table reference that broke pull request creation.",
+          "supported": true,
+          "reason": "Excerpt: 'leaving a non-existent reference that resulted in errors creating pull requests'"
+        },
+        {
+          "claim": "The excerpt does not cover database container creation, invalid-input errors, or regional spread.",
+          "supported": true,
+          "reason": "Excerpt only discusses pull request creation, Vitess backfill, and VReplication lag; no mention of containers, invalid input, or regions"
+        },
+        {
+          "claim": "The shared pattern is a schema or backing-table change in the data layer causing create operations to fail.",
+          "supported": true,
+          "reason": "Excerpt: 'due to a database vschema change' and 'dropped the backing table... resulted in errors creating pull requests'"
+        },
+        {
+          "claim": "Check whether any schema, migration, or backfill job ran in the affected regions around the time failures began.",
+          "supported": false,
+          "reason": "Generic advice; excerpts do not mention checking for schema/migration/backfill jobs in affected regions"
+        },
+        {
+          "claim": "Verify that the backing tables or references used by container creation still exist in each region's database.",
+          "supported": false,
+          "reason": "Generic advice; excerpts do not mention container creation or per-region verification"
+        },
+        {
+          "claim": "Compare the failing region's schema against a healthy one.",
+          "supported": false,
+          "reason": "Generic advice; no excerpt mentions comparing schemas across regions"
+        },
+        {
+          "claim": "If a backfill or cancellation is involved, check for dropped tables and restore them from backup or recreate them before retrying.",
+          "supported": false,
+          "reason": "Excerpts describe the dropped table but give no remediation such as restoring from backup or recreating"
+        },
+        {
+          "claim": "Confirm the rollout is halted in the second region so the failure does not spread further.",
+          "supported": false,
+          "reason": "Generic advice; excerpts do not mention a second region or halting a rollout"
+        },
+        {
+          "claim": "The excerpts give no direct remediation for database container creation.",
+          "supported": true,
+          "reason": "Excerpts contain no remediation steps at all, and no mention of container creation"
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 680,
+        "output_tokens": 640,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 970
+    },
+    {
+      "id": "q013",
+      "query": "Users found that browser extensions and add-ons stopped working or were disabled unexpectedly, affecting a large number of users. The problem persisted for an extended period and required multiple rounds of fixes before it was fully resolved.",
+      "doc_id": 110,
+      "no_match": false,
+      "likely_cause": "The excerpts do not describe this incident directly. They come from two unrelated outages (a Chromium sync-throttling server misconfiguration and a Firefox network hang), and neither mentions browser extensions being disabled. The Chromium excerpt suggests a server-side change to throttled sync datatypes that the client mishandled, causing crashes. The Firefox excerpt suggests a hang in a network request to an internal service, possibly linked to HTTP/3 being enabled, but it does not confirm that link. Neither excerpt establishes the cause of extensions being disabled, so the cause is only partly covered and cannot be confirmed from these excerpts.",
+      "suggested_fix": "Partial guidance only. Check whether extension disabling was driven by a server-side configuration or sync change, as in the Chromium case, by comparing the timing of the incident with recent server-side changes. Also check client-side handling of unexpected server responses. Roll back any recent server-side configuration change, then add client-side handling for unexpected responses. Gather more evidence, such as extension-specific logs or the change history, before applying further fixes, since the excerpts do not cover extensions directly.",
+      "cited_doc_ids": [
+        78,
+        111
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        9,
+        75,
+        78,
+        111,
+        115,
+        195,
+        205,
+        211,
+        219
+      ],
+      "agent_usage": {
+        "input_tokens": 13424,
+        "output_tokens": 1190,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The excerpts come from two unrelated outages: a Chromium sync-throttling server misconfiguration and a Firefox network hang.",
+          "supported": true,
+          "reason": "Doc 78 describes Chromium throttling of sync datatypes causing crashes; doc 111 describes a Firefox hang inside a network request to an internal service."
+        },
+        {
+          "claim": "Neither excerpt mentions browser extensions being disabled.",
+          "supported": true,
+          "reason": "No excerpt text references extensions or extension disabling."
+        },
+        {
+          "claim": "The Chromium excerpt suggests a server-side change to throttled sync datatypes that the client mishandled, causing crashes.",
+          "supported": true,
+          "reason": "Doc 78: 'the server is (for some reason) throttling all types in certain cases' and 'the client isn't handling the responses correctly'."
+        },
+        {
+          "claim": "The Firefox excerpt suggests a hang in a network request to an internal service.",
+          "supported": true,
+          "reason": "Doc 111: 'the client was hanging inside a network request to one of the Firefox internal services'."
+        },
+        {
+          "claim": "The Firefox excerpt possibly links the hang to HTTP/3 being enabled, but does not confirm that link.",
+          "supported": true,
+          "reason": "Doc 111 mentions HTTP/3 had been enabled but offers no explanation for why the problem triggered, so the link is unconfirmed."
+        },
+        {
+          "claim": "Neither excerpt establishes the cause of extensions being disabled.",
+          "supported": true,
+          "reason": "The excerpts do not discuss extensions at all."
+        },
+        {
+          "claim": "The cause of the incident is only partly covered and cannot be confirmed from these excerpts.",
+          "supported": true,
+          "reason": "The excerpts describe unrelated outages and never address extension disabling."
+        },
+        {
+          "claim": "Check whether extension disabling was driven by a server-side configuration or sync change, as in the Chromium case, by comparing the timing of the incident with recent server-side changes.",
+          "supported": false,
+          "reason": "Generic investigative advice; no excerpt mentions extensions or recommends this comparison."
+        },
+        {
+          "claim": "Check client-side handling of unexpected server responses.",
+          "supported": false,
+          "reason": "Generic advice; doc 78 notes the client mishandled responses but no excerpt recommends this check for the incident."
+        },
+        {
+          "claim": "Roll back any recent server-side configuration change, then add client-side handling for unexpected responses.",
+          "supported": false,
+          "reason": "No excerpt recommends a rollback or this remediation sequence."
+        },
+        {
+          "claim": "Gather more evidence, such as extension-specific logs or the change history, before applying further fixes.",
+          "supported": false,
+          "reason": "Generic advice not stated in any excerpt."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 884,
+        "output_tokens": 560,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1866
+    },
+    {
+      "id": "q014",
+      "query": "Total outage for about 18 minutes, plus on-and-off slow responses and intermittent errors for the rest of the day. A small subset of repositories also became unavailable for a large part of the day.",
+      "doc_id": 235,
+      "no_match": false,
+      "likely_cause": "Network problems on Friday, November 30th caused the 18-minute complete outage and the day-long slow responses and intermittent errors. The network issues also disrupted the high-availability clustering between fileserver nodes, which took a single fileserver pair offline for a large part of the day and made a small percentage of repositories unavailable. The excerpt describes these network problems and their clustering impact but does not give the specific root trigger of the network failure.",
+      "suggested_fix": "The excerpt does not cover a specific fix. Based on the summary, the follow-up work is to harden the network and the high-availability clustering between fileserver nodes so that network disruption does not take a fileserver pair offline. The full postmortem would need to be consulted for the concrete remediation steps and the root trigger.",
+      "cited_doc_ids": [
+        235
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        39,
+        224,
+        226,
+        232,
+        235
+      ],
+      "agent_usage": {
+        "input_tokens": 6879,
+        "output_tokens": 692,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "Network problems occurred on Friday, November 30th.",
+          "supported": true,
+          "reason": "Excerpt: 'On Friday, November 30th, GitHub had a rough day' and 'Network problems last Friday'."
+        },
+        {
+          "claim": "The network problems caused 18 minutes of complete unavailability.",
+          "supported": true,
+          "reason": "Excerpt: 'We experienced 18 minutes of complete unavailability' in context of the network problems."
+        },
+        {
+          "claim": "The network problems caused sporadic bursts of slow responses and intermittent errors for the entire day.",
+          "supported": true,
+          "reason": "Excerpt: 'sporadic bursts of slow responses and intermittent errors for the entire day'."
+        },
+        {
+          "claim": "The network issues disrupted the high-availability clustering between fileserver nodes.",
+          "supported": true,
+          "reason": "Excerpt: 'their impact on the high-availability clustering between the fileserver nodes'."
+        },
+        {
+          "claim": "A single fileserver pair was offline for a large part of the day.",
+          "supported": true,
+          "reason": "Excerpt: 'we had a single fileserver pair offline for a large part of the day'."
+        },
+        {
+          "claim": "The fileserver outage affected a small percentage of repositories.",
+          "supported": true,
+          "reason": "Excerpt: 'affecting a small percentage of repositories'."
+        },
+        {
+          "claim": "The excerpt does not give the specific root trigger of the network failure.",
+          "supported": true,
+          "reason": "The excerpt describes symptoms and clustering impact but no root trigger is stated."
+        },
+        {
+          "claim": "The excerpt does not cover a specific fix.",
+          "supported": true,
+          "reason": "The excerpt mentions intent to explain prevention but gives no concrete remediation steps."
+        },
+        {
+          "claim": "The follow-up work is to harden the network and the high-availability clustering between fileserver nodes so that network disruption does not take a fileserver pair offline.",
+          "supported": false,
+          "reason": "No excerpt states this specific remediation; it is inferred advice not mentioned in the text."
+        },
+        {
+          "claim": "The full postmortem would need to be consulted for concrete remediation steps and the root trigger.",
+          "supported": false,
+          "reason": "This is a recommendation about consulting other material, not stated in the excerpt."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 528,
+        "output_tokens": 480,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 790
+    },
+    {
+      "id": "q015",
+      "query": "Seeing high latency on music playback for a large share of users in one region, plus some users unable to log in at all. Playback is degraded and requests are timing out; lasted a few hours.",
+      "doc_id": 67,
+      "no_match": false,
+      "likely_cause": "Traffic peak overloaded one regional datacenter's load balancers. A service-mesh sidecar hit its concurrency limit and did not scale up, so requests backed up and several load-balancer nodes exhausted network flow limits. This degraded the shared gateway authentication path, causing widespread auth latency and failures for services routed through that datacenter. A latent client retry bug amplified traffic to one internal authentication endpoint, which slowed recovery. Note: the excerpt is a GitHub availability report describing a different incident. It matches the symptom pattern (regional latency, login failures, timeouts) but does not mention music playback, so the match is partial and should be verified against this incident's own telemetry.",
+      "suggested_fix": "Make the service-mesh sidecar autoscale under load so its concurrency limit does not become a bottleneck. Fix the client retry bug and add bounded retries with backoff and jitter to prevent amplification. Add capacity headroom and flow-limit alerting on the regional load balancers. Confirm the affected region's load balancers and auth gateway are the same path before applying these fixes to the music playback service.",
+      "cited_doc_ids": [
+        172
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        2,
+        8,
+        147,
+        172,
+        187,
+        203,
+        209,
+        210,
+        223
+      ],
+      "agent_usage": {
+        "input_tokens": 12740,
+        "output_tokens": 1083,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "A traffic peak overloaded one regional datacenter's load balancers.",
+          "supported": true,
+          "reason": "Excerpt: 'A new peak in traffic pushed one datacenter's load balancers past their limits.'"
+        },
+        {
+          "claim": "A service-mesh sidecar hit its concurrency limit and did not scale up.",
+          "supported": true,
+          "reason": "Excerpt: 'A service-mesh sidecar reached its concurrency limit and did not scale up.'"
+        },
+        {
+          "claim": "Requests backed up and several load-balancer nodes exhausted network flow limits.",
+          "supported": true,
+          "reason": "Excerpt: 'As requests backed up, several of the datacenter's load-balancer nodes exhausted their network flow limits.'"
+        },
+        {
+          "claim": "This degraded the shared gateway authentication path, causing widespread auth latency and failures for services routed through that datacenter.",
+          "supported": true,
+          "reason": "Excerpt: 'degraded the shared gateway authentication path and produced widespread authentication latency and failures across the many services that route through that datacenter.'"
+        },
+        {
+          "claim": "A latent client retry bug amplified traffic to one internal authentication endpoint, which slowed recovery.",
+          "supported": true,
+          "reason": "Excerpt: 'A latent client retry bug sharply amplified traffic to one internal authentication endpoint, which slowed recovery.'"
+        },
+        {
+          "claim": "The excerpt is a GitHub availability report describing a different incident.",
+          "supported": true,
+          "reason": "Doc title: 'GitHub availability report: August 2026'."
+        },
+        {
+          "claim": "The excerpt does not mention music playback, so the match is partial and should be verified against this incident's own telemetry.",
+          "supported": true,
+          "reason": "Excerpt contains no mention of music playback; it describes a GitHub datacenter incident."
+        },
+        {
+          "claim": "Make the service-mesh sidecar autoscale under load so its concurrency limit does not become a bottleneck.",
+          "supported": true,
+          "reason": "Excerpt identifies 'our service-mesh sidecar did not scale up' as a core weakness, implying autoscaling as the fix."
+        },
+        {
+          "claim": "Fix the client retry bug and add bounded retries with backoff and jitter to prevent amplification.",
+          "supported": false,
+          "reason": "Excerpt mentions the retry bug and that clients 'were not bound enough', but does not mention backoff or jitter."
+        },
+        {
+          "claim": "Add capacity headroom and flow-limit alerting on the regional load balancers.",
+          "supported": false,
+          "reason": "Excerpt mentions flow limits were exhausted but gives no advice about capacity headroom or alerting."
+        },
+        {
+          "claim": "Confirm the affected region's load balancers and auth gateway are the same path before applying these fixes to the music playback service.",
+          "supported": false,
+          "reason": "No excerpt mentions music playback or verifying the path before applying fixes."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 586,
+        "output_tokens": 610,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 817
+    },
+    {
+      "id": "q016",
+      "query": "Major service outage: the whole site was unavailable for many hours, and database-backed content like projects, comments, issues, snippets and new accounts created during the window was lost. Hosted code repositories and wikis were also unreachable during the outage.",
+      "doc_id": 34,
+      "no_match": false,
+      "likely_cause": "The excerpts describe a database outage (a postmortem titled \"Postmortem of database outage of January 31\") that led to loss of production data, including projects, comments, issues, snippets and new accounts created during the window. The excerpts do not state the technical root cause (such as the specific failure, replication or backup problem, or operator error). They only confirm that data was lost during the database outage and that recovery and operations procedures were under review. Hosted repositories and wikis being unreachable is not explained by these excerpts.",
+      "suggested_fix": "The excerpts do not provide a specific fix. Based only on the postmortem's stated direction, the remedy is to improve operations and recovery procedures for the production database, so that data loss of this kind is prevented and recovery is faster. The full postmortem should be consulted for the concrete technical changes, the root cause, and the recovery steps, which these excerpts do not cover.",
+      "cited_doc_ids": [
+        34
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        33,
+        34,
+        39,
+        89,
+        113,
+        158,
+        176,
+        227
+      ],
+      "agent_usage": {
+        "input_tokens": 13065,
+        "output_tokens": 1217,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The excerpts describe a database outage on January 31.",
+          "supported": true,
+          "reason": "Excerpt title: 'Postmortem of database outage of January 31'."
+        },
+        {
+          "claim": "The outage led to loss of production data.",
+          "supported": true,
+          "reason": "Excerpt: 'Losing production data is unacceptable' and 'the GitLab.com users whose data we lost'."
+        },
+        {
+          "claim": "The lost data included projects, comments, issues, snippets and new accounts created during the window.",
+          "supported": false,
+          "reason": "The excerpt only says 'data we lost'; it does not enumerate projects, comments, issues, snippets, or accounts."
+        },
+        {
+          "claim": "The excerpts do not state the technical root cause.",
+          "supported": true,
+          "reason": "Excerpt only mentions 'what went wrong' generally and improvements to 'operations & recovery procedures'; no specific failure, replication, backup, or operator error is given."
+        },
+        {
+          "claim": "The excerpts confirm data was lost during the database outage.",
+          "supported": true,
+          "reason": "Excerpt: 'the GitLab.com users whose data we lost' in the context of the database outage postmortem."
+        },
+        {
+          "claim": "Recovery and operations procedures were under review.",
+          "supported": true,
+          "reason": "Excerpt: 'we're working on multiple improvements to our operations & recovery procedures'."
+        },
+        {
+          "claim": "Hosted repositories and wikis being unreachable is not explained by these excerpts.",
+          "supported": true,
+          "reason": "The excerpts mention only a database outage and data loss; repositories and wikis are not mentioned."
+        },
+        {
+          "claim": "The excerpts do not provide a specific fix.",
+          "supported": true,
+          "reason": "Excerpt only states 'multiple improvements to our operations & recovery procedures'; no concrete technical fix is given."
+        },
+        {
+          "claim": "The remedy is to improve operations and recovery procedures for the production database to prevent data loss and speed recovery.",
+          "supported": true,
+          "reason": "Excerpt: 'working on multiple improvements to our operations & recovery procedures ... to ensure this does not happen again'."
+        },
+        {
+          "claim": "The full postmortem should be consulted for concrete technical changes, root cause, and recovery steps.",
+          "supported": false,
+          "reason": "This is generic advice not stated in the excerpts."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 506,
+        "output_tokens": 496,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 526
+    },
+    {
+      "id": "q017",
+      "query": "Seeing widespread DNS resolution failures where lookups return empty answers for names that should resolve fine; some clients on Linux fail while others work. Started gradually over the last day and still ongoing. Anyone seen similar?",
+      "doc_id": 12,
+      "no_match": false,
+      "likely_cause": "An Ubuntu security patch to systemd broke DNS resolution on Linux hosts. Unattended security upgrades (enabled by default on recent Ubuntu) installed the patch on running VMs, after which DNS lookups failed. This matches the report's Linux-specific pattern, though the excerpts describe a different incident (GitHub Codespaces, August 2022) and do not confirm that the current incident has the same cause. The excerpts also do not describe the exact empty-answer symptom or any check of the current systemd version.",
+      "suggested_fix": "Check whether affected Linux clients or hosts recently received the systemd security update (e.g., via unattended-upgrades logs) and whether systemd-resolved is handling resolution. As a mitigation, the excerpted incident disabled systemd's DNS resolver and manually configured an upstream DNS resolver IP on the affected hosts, which restored service. Pause or roll back the unattended security patch on affected hosts while investigating. The excerpts do not cover a permanent fix.",
+      "cited_doc_ids": [
+        226
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        12,
+        160,
+        165,
+        226
+      ],
+      "agent_usage": {
+        "input_tokens": 7184,
+        "output_tokens": 861,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "An Ubuntu security patch to systemd broke DNS resolution on Linux hosts.",
+          "supported": true,
+          "reason": "Excerpt: 'This incident was caused by an Ubuntu security patch in systemd that broke DNS resolution.'"
+        },
+        {
+          "claim": "Unattended security upgrades are enabled by default on recent Ubuntu.",
+          "supported": true,
+          "reason": "Excerpt: 'In recent versions of Ubuntu, unattended upgrades for security fixes are enabled by default.'"
+        },
+        {
+          "claim": "The patch was installed on running VMs, after which DNS lookups failed.",
+          "supported": true,
+          "reason": "Excerpt: 'Once the patch was installed on a VM, DNS resolution was broken.'"
+        },
+        {
+          "claim": "The excerpts describe a different incident (GitHub Codespaces, August 2022) and do not confirm the current incident has the same cause.",
+          "supported": true,
+          "reason": "Excerpts are from GitHub Availability Report September 2022, follow-up to August 29 incident about Codespaces host VMs; they do not address any current incident."
+        },
+        {
+          "claim": "The excerpts do not describe the exact empty-answer symptom.",
+          "supported": true,
+          "reason": "Excerpts mention failure creating/starting Codespaces or outbound network call failures, not empty answers."
+        },
+        {
+          "claim": "The excerpts do not describe any check of the current systemd version.",
+          "supported": true,
+          "reason": "No excerpt mentions checking systemd version."
+        },
+        {
+          "claim": "Check whether affected Linux clients or hosts recently received the systemd security update (e.g., via unattended-upgrades logs).",
+          "supported": false,
+          "reason": "Excerpts describe the patch being applied but do not recommend checking unattended-upgrades logs or any diagnostic step."
+        },
+        {
+          "claim": "Check whether systemd-resolved is handling resolution.",
+          "supported": true,
+          "reason": "Excerpt: 'Once we identified systemd's DNS resolver configuration as the source of these errors' \u2014 implies checking systemd's DNS resolver."
+        },
+        {
+          "claim": "As a mitigation, the excerpted incident disabled systemd's DNS resolver and manually configured an upstream DNS resolver IP on the affected hosts, which restored service.",
+          "supported": true,
+          "reason": "Excerpt: 'we were able to mitigate the issue by disabling systemd's DNS resolver and manually configuring an upstream DNS resolver IP address... all metrics were fully healthy and the incident was resolved.'"
+        },
+        {
+          "claim": "Pause or roll back the unattended security patch on affected hosts while investigating.",
+          "supported": false,
+          "reason": "Excerpts do not mention pausing or rolling back the patch; mitigation was disabling the DNS resolver and configuring an upstream resolver."
+        },
+        {
+          "claim": "The excerpts do not cover a permanent fix.",
+          "supported": true,
+          "reason": "Excerpts only describe mitigation and resolution, not a permanent fix."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 709,
+        "output_tokens": 604,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1369
+    },
+    {
+      "id": "q018",
+      "query": "Seeing exception processing delays up to several hours for a small number of events, while the site stays up and readable. Also, all writes to account and billing data are failing, so signups, password changes, and billing updates are completely down.",
+      "doc_id": 87,
+      "no_match": false,
+      "likely_cause": "The excerpts point to a failed redis-master recovery that was caused by an incorrect redis-master configuration. The failed recovery lost in-flight balance data and the ability to update balances, which broke writes to account and billing data. The excerpts describe this billing incident and its redis-master root cause, but they do not describe the separate exception-processing delays of several hours, so that symptom is not covered.",
+      "suggested_fix": "Replace the faulty redis cluster and correct the redis-master configuration. Disable Redis restarts on redis-master and recover future redis-master failures by promoting a slave. Restore balances from the independent double-bookkeeping datastore. Add fail-safes so that accounts are not suspended or charged when balances are missing or cannot be written, and validate billing against the double-bookkeeping databases in real time. The excerpts do not cover a fix for the exception processing delays, so that needs separate investigation.",
+      "cited_doc_ids": [
+        130
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        4,
+        39,
+        130,
+        151,
+        184,
+        209,
+        224
+      ],
+      "agent_usage": {
+        "input_tokens": 9538,
+        "output_tokens": 1006,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "A failed redis-master recovery occurred.",
+          "supported": true,
+          "reason": "Excerpt references 'the failed recovery of the redis-master'."
+        },
+        {
+          "claim": "The failed redis-master recovery was caused by an incorrect redis-master configuration.",
+          "supported": true,
+          "reason": "'The incorrect configuration for redis-master was identified and corrected.'"
+        },
+        {
+          "claim": "The failed recovery lost in-flight balance data and the ability to update balances.",
+          "supported": true,
+          "reason": "'The simultaneous loss of in-flight balance data and the ability to update balances...'"
+        },
+        {
+          "claim": "The loss of balance data and update ability broke writes to account and billing data.",
+          "supported": false,
+          "reason": "Excerpts say balances couldn't be written, but do not state that writes to account and billing data were broken."
+        },
+        {
+          "claim": "The excerpts describe a billing incident with a redis-master root cause.",
+          "supported": true,
+          "reason": "Title 'Billing Incident Post-Mortem' and root cause section on redis-master recovery."
+        },
+        {
+          "claim": "The excerpts do not describe separate exception-processing delays of several hours.",
+          "supported": true,
+          "reason": "No mention of exception-processing delays in either excerpt."
+        },
+        {
+          "claim": "The fix is to replace the faulty redis cluster.",
+          "supported": true,
+          "reason": "'we replaced the original redis cluster that triggered the incident.'"
+        },
+        {
+          "claim": "The fix is to correct the redis-master configuration.",
+          "supported": true,
+          "reason": "'The incorrect configuration for redis-master was identified and corrected.'"
+        },
+        {
+          "claim": "The fix is to disable Redis restarts on redis-master.",
+          "supported": true,
+          "reason": "'Redis restarts on redis-master are disabled'."
+        },
+        {
+          "claim": "The fix is to recover future redis-master failures by promoting a slave.",
+          "supported": true,
+          "reason": "'future redis-master recoveries will be accomplished by pivoting a slave.'"
+        },
+        {
+          "claim": "The fix is to restore balances from the independent double-bookkeeping datastore.",
+          "supported": true,
+          "reason": "'this independent record was used to restore the account balances'."
+        },
+        {
+          "claim": "The fix is to add fail-safes so accounts are not suspended or charged when balances are missing or cannot be written.",
+          "supported": true,
+          "reason": "'if billing balances don't exist or cannot be written, the system will not suspend accounts or charge credit cards.'"
+        },
+        {
+          "claim": "The fix is to validate billing against the double-bookkeeping databases in real time.",
+          "supported": true,
+          "reason": "'updating the billing system to validate against our double-bookkeeping databases in real-time.'"
+        },
+        {
+          "claim": "The excerpts do not cover a fix for exception-processing delays.",
+          "supported": true,
+          "reason": "No mention of exception-processing delays or their remediation."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 708,
+        "output_tokens": 607,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1566
+    },
+    {
+      "id": "q019",
+      "query": "Site-wide outage during a scheduled maintenance window: the whole service went into maintenance mode and stayed down for over five hours. Storage nodes in redundant pairs dropped out together and had to be brought back one by one, so file access and all dependent features were unavailable until recovery finished.",
+      "doc_id": 233,
+      "no_match": false,
+      "likely_cause": "The excerpts only partly cover the cause. Doc 233 shows the outage lasted over five hours because storage fileserver pairs had to be restarted and validated one by one, including confirming replication between pair members, before the site returned to service. They do not state what triggered the simultaneous drop-out of the redundant storage nodes during the maintenance window, so the initial trigger is not established.",
+      "suggested_fix": "Based on the excerpts, the recovery itself was slow because pairs were restored serially and each needed validation and replication checks. Improving this would mean making pair recovery faster and more parallel, with automated replication verification. Identifying the root trigger for the simultaneous storage drop-out needs more information than these excerpts provide, such as the maintenance procedure logs and the storage pair failure reports.",
+      "cited_doc_ids": [
+        233
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        33,
+        39,
+        233
+      ],
+      "agent_usage": {
+        "input_tokens": 6818,
+        "output_tokens": 716,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The outage lasted over five hours.",
+          "supported": true,
+          "reason": "Excerpt states the recovery 'took over five hours to complete'."
+        },
+        {
+          "claim": "Storage fileserver pairs had to be restarted and validated one by one.",
+          "supported": false,
+          "reason": "Excerpt says they had to 'restart a large percentage of the entire GitHub file storage infrastructure' and validate, but does not say pairs were restarted one by one; the answer's 'one by one' is not stated."
+        },
+        {
+          "claim": "Confirming replication between pair members was part of the recovery before the site returned to service.",
+          "supported": true,
+          "reason": "Excerpt: 'make sure that all of the pairs were properly replicating between themselves again' before returning site to service."
+        },
+        {
+          "claim": "The excerpts do not state what triggered the simultaneous drop-out of the redundant storage nodes during the maintenance window.",
+          "supported": true,
+          "reason": "The excerpt only describes recovery, not the initial trigger; no cause is given."
+        },
+        {
+          "claim": "The initial trigger is not established by the excerpts.",
+          "supported": true,
+          "reason": "Excerpt contains no statement of the root cause or trigger."
+        },
+        {
+          "claim": "The recovery was slow because pairs were restored serially.",
+          "supported": false,
+          "reason": "Excerpt attributes the five-hour duration to the widespread nature of the problem and restarting a large percentage of infrastructure, not to serial pair restoration."
+        },
+        {
+          "claim": "Each pair needed validation and replication checks during recovery.",
+          "supported": true,
+          "reason": "Excerpt mentions validating things were working and ensuring pairs were properly replicating."
+        },
+        {
+          "claim": "Improving recovery would mean making pair recovery faster and more parallel.",
+          "supported": false,
+          "reason": "No excerpt mentions making recovery faster or more parallel; this is generic advice not stated."
+        },
+        {
+          "claim": "Automated replication verification would improve recovery.",
+          "supported": false,
+          "reason": "No excerpt mentions automation of replication verification; unsupported generic advice."
+        },
+        {
+          "claim": "Identifying the root trigger would require more information such as maintenance procedure logs and storage pair failure reports.",
+          "supported": false,
+          "reason": "Excerpts do not mention maintenance procedure logs or storage pair failure reports; this is outside the cited text."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 455,
+        "output_tokens": 488,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 571
+    },
+    {
+      "id": "q020",
+      "query": "Seeing error pages instead of content for requests through our edge network, and in a separate case blank pages returned to users. Both events hit a large share of traffic globally and cleared up on their own within roughly half an hour to a couple of hours.",
+      "doc_id": 15,
+      "no_match": false,
+      "likely_cause": "The excerpts point to a bad configuration/feature file propagated across the edge network. In the November 18, 2025 incident, a bad feature file was distributed to the network, with good and bad files alternating until every ClickHouse node generated the bad file, leading to 5xx errors across the CDN. This matches the error pages seen on a large share of global traffic. The blank-page event is only partly covered: the excerpts do not describe blank pages specifically. The October 25, 2022 incident involved a faulty CDN software release that caused HTTP 530 errors for some customers, which may be a separate cause for the other event. The excerpts do not confirm that either event matches this incident's self-recovery pattern, and they do not describe the exact cause of the blank pages.",
+      "suggested_fix": "For the error-page event: stop generation and propagation of the bad configuration file, restore a known good file into the distribution queue, and restart the core proxy and any services left in a bad state. Add validation before config distribution so bad files cannot roll out globally. For the blank-page event, the excerpts do not provide enough detail; investigate separately, checking for a recent release or configuration change affecting the CDN, and verify it against the 2022 release-rollout pattern. Also check whether debugging/observability overhead is causing latency or CPU exhaustion.",
+      "cited_doc_ids": [
+        2,
+        29
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        2,
+        29,
+        66,
+        120,
+        147,
+        187,
+        193,
+        195,
+        232
+      ],
+      "agent_usage": {
+        "input_tokens": 10599,
+        "output_tokens": 1129,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "In the November 18, 2025 incident, a bad feature file was distributed to the network.",
+          "supported": true,
+          "reason": "Excerpt: 'sometimes good, sometimes bad configuration files were distributed to our network' and 'stopping the generation and propagation of the bad feature file'."
+        },
+        {
+          "claim": "In the November 18, 2025 incident, good and bad files alternated until every ClickHouse node generated the bad file.",
+          "supported": true,
+          "reason": "Excerpt: 'every ClickHouse node was generating the bad configuration file and the fluctuation stabilized in the failing state'."
+        },
+        {
+          "claim": "The November 18, 2025 incident led to 5xx errors across the CDN.",
+          "supported": true,
+          "reason": "Excerpt: 'with 5xx error code volume returning to normal at 17:06' and 'returning HTTP 5xx errors'."
+        },
+        {
+          "claim": "The November 18, 2025 incident matches error pages seen on a large share of global traffic.",
+          "supported": false,
+          "reason": "Excerpts mention 5xx errors and an error page for failed authentication, but do not state a match to a large share of global traffic."
+        },
+        {
+          "claim": "The excerpts do not describe blank pages specifically.",
+          "supported": true,
+          "reason": "No excerpt mentions blank pages."
+        },
+        {
+          "claim": "The October 25, 2022 incident involved a faulty CDN software release that caused HTTP 530 errors for some customers.",
+          "supported": true,
+          "reason": "Excerpt: 'a software release of a CDN component containing a bug' causing 'a subset of those customers to return HTTP Status Code 530'."
+        },
+        {
+          "claim": "The October 25, 2022 incident may be a separate cause for the other event.",
+          "supported": false,
+          "reason": "This is speculation; excerpts do not link the 2022 incident to any other event."
+        },
+        {
+          "claim": "The excerpts do not confirm that either event matches this incident's self-recovery pattern.",
+          "supported": true,
+          "reason": "Excerpts describe recovery via manual intervention (stopping bad file, rollback, restart), not self-recovery; no self-recovery pattern is stated."
+        },
+        {
+          "claim": "The excerpts do not describe the exact cause of the blank pages.",
+          "supported": true,
+          "reason": "No excerpt mentions blank pages or their cause."
+        },
+        {
+          "claim": "Fix for the error-page event: stop generation and propagation of the bad configuration file.",
+          "supported": true,
+          "reason": "Excerpt: 'We solved the problem by stopping the generation and propagation of the bad feature file'."
+        },
+        {
+          "claim": "Fix for the error-page event: restore a known good file into the distribution queue.",
+          "supported": true,
+          "reason": "Excerpt: 'manually inserting a known good file into the feature file distribution queue'."
+        },
+        {
+          "claim": "Fix for the error-page event: restart the core proxy and any services left in a bad state.",
+          "supported": true,
+          "reason": "Excerpt: 'forcing a restart of our core proxy' and 'restarting remaining services that had entered a bad state'."
+        },
+        {
+          "claim": "Add validation before config distribution so bad files cannot roll out globally.",
+          "supported": false,
+          "reason": "Generic advice; no excerpt mentions adding validation before distribution."
+        },
+        {
+          "claim": "For the blank-page event, investigate separately, checking for a recent release or configuration change affecting the CDN.",
+          "supported": false,
+          "reason": "Generic advice not stated in excerpts; excerpts do not address blank pages."
+        },
+        {
+          "claim": "Verify the blank-page event against the 2022 release-rollout pattern.",
+          "supported": false,
+          "reason": "Speculative advice; excerpts do not connect the 2022 rollout to blank pages."
+        },
+        {
+          "claim": "Check whether debugging/observability overhead is causing latency or CPU exhaustion.",
+          "supported": true,
+          "reason": "Excerpt: 'large amounts of CPU being consumed by our debugging and observability systems' causing 'significant increases in latency'."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1032,
+        "output_tokens": 870,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 2742
+    },
+    {
+      "id": "q021",
+      "query": "Total outage across all user-facing components, roughly an hour, with no data processed or accessed at all. Ingest performance degraded gradually beforehand, then the whole system crashed and stayed down until recovery.",
+      "doc_id": 125,
+      "no_match": false,
+      "likely_cause": "Excerpts indicate the outage followed a late-July-24 switch between two Retriever clusters (storage/query engine), which the team considered routine. Ingest (Shepherd) SLO then burned slowly for hours, and a later chart pointed to database calls that Retriever uses to update last-seen timestamps for fields/datasets, which feed the ingest caching mechanism. The excerpts are cut off before the full causal chain to the total outage is shown, so the exact mechanism that took all components down is only partly covered.",
+      "suggested_fix": "Excerpts do not state a complete fix. Based on the visible evidence: treat cluster switches as higher-risk changes and verify ingest SLO and cache/database behavior after them; do not dismiss gradual ingest SLO burn as minor without investigation; and review the cache refresh path that depends on these last-seen database updates. Consult the full report referenced in the document for remediation details.",
+      "cited_doc_ids": [
+        125
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        33,
+        39,
+        59,
+        125
+      ],
+      "agent_usage": {
+        "input_tokens": 12325,
+        "output_tokens": 859,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The outage followed a switch between two Retriever clusters (storage/query engine) late on July 24th.",
+          "supported": true,
+          "reason": "\"Late on July 24th, we switched between two clusters of Retriever (our storage and query engine)\""
+        },
+        {
+          "claim": "The team considered the cluster switch routine.",
+          "supported": true,
+          "reason": "\"This is a routine change we've done multiple times in the past, which we knew to be safe.\""
+        },
+        {
+          "claim": "The Shepherd (ingest) SLO burned slowly for hours after the switch.",
+          "supported": true,
+          "reason": "\"Hours later, our internal SLO for Shepherd (our ingest service) started slowly burning.\""
+        },
+        {
+          "claim": "A later chart pointed to database calls that Retriever uses to update last-seen timestamps for fields/datasets.",
+          "supported": true,
+          "reason": "\"The blue lines that suddenly stop are database calls. They are sent when Retriever updates the records containing the last time we received data for any field or dataset.\""
+        },
+        {
+          "claim": "These last-seen timestamp updates feed the ingest caching mechanism.",
+          "supported": true,
+          "reason": "\"This is used by our caching mechanism to know which dataset schemas we needed to refresh and keep warm for the ingest service.\""
+        },
+        {
+          "claim": "The excerpts are cut off before the full causal chain to the total outage is shown.",
+          "supported": true,
+          "reason": "The final excerpt ends mid-sentence (\"We first \"), so the full chain is not shown."
+        },
+        {
+          "claim": "The exact mechanism that took all components down is only partly covered in the excerpts.",
+          "supported": true,
+          "reason": "Excerpts end before the full causal chain is described."
+        },
+        {
+          "claim": "The excerpts do not state a complete fix.",
+          "supported": true,
+          "reason": "No remediation is stated; the document only references a full report for details."
+        },
+        {
+          "claim": "Treat cluster switches as higher-risk changes and verify ingest SLO and cache/database behavior after them.",
+          "supported": false,
+          "reason": "Generic advice not stated in the excerpts."
+        },
+        {
+          "claim": "Do not dismiss gradual ingest SLO burn as minor without investigation.",
+          "supported": false,
+          "reason": "Generic advice not stated in the excerpts."
+        },
+        {
+          "claim": "Review the cache refresh path that depends on these last-seen database updates.",
+          "supported": false,
+          "reason": "Generic advice not stated in the excerpts."
+        },
+        {
+          "claim": "Consult the full report referenced in the document for remediation details.",
+          "supported": true,
+          "reason": "\"For a more detailed view, download the full report [PDF].\""
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1155,
+        "output_tokens": 578,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 3551
+    },
+    {
+      "id": "q022",
+      "query": "Seeing corrupted pages returned to some clients, with fragments of other users' request data showing up in responses; also memory growth on edge nodes after a feature rollout. Anyone else seeing this?",
+      "doc_id": 26,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 2,
+      "answer_notes": [],
+      "graded_relevant": 0,
+      "retrieved_doc_ids": [
+        2,
+        5,
+        6,
+        19,
+        29,
+        67,
+        117,
+        120,
+        125,
+        147,
+        162,
+        163,
+        168,
+        172,
+        173,
+        183,
+        191,
+        209,
+        230
+      ],
+      "agent_usage": {
+        "input_tokens": 34726,
+        "output_tokens": 2226,
+        "llm_calls": 13
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q023",
+      "query": "Spacecraft experienced repeated resets and lost science data collection during surface operations; data distribution and bus scheduling tasks stopped completing their cycles, causing watchdog-triggered reboots and gaps in instrument data.",
+      "doc_id": 79,
+      "no_match": false,
+      "likely_cause": "The bc_dist task failed to complete its execution before the bc_sched task started. The spacecraft treats this overrun as a fault and responds by resetting the computer, which terminates the ground-commanded activities in progress. This matches the reported pattern of repeated watchdog-triggered reboots, with data distribution and bus scheduling tasks not completing their cycles. The excerpts describe the mechanism and the reset behavior, but they do not identify why bc_dist overruns in this incident (for example, a load, timing, or software defect), so the root trigger is only partly covered.",
+      "suggested_fix": "Investigate why bc_dist is not finishing before bc_sched starts (check its execution time and timing margins under the current workload and surface-operations load). Fix the timing or scheduling overrun so bc_dist completes within its window. Until that is resolved, rely on the existing recovery mechanisms, which resume interrupted activities after a reset, and reschedule any activities lost when the reset terminated them, since the excerpts say remaining activities otherwise slip to the next day.",
+      "cited_doc_ids": [
+        79
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        79,
+        118,
+        213
+      ],
+      "agent_usage": {
+        "input_tokens": 7208,
+        "output_tokens": 743,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The bc_dist task failed to complete its execution before the bc_sched task started.",
+          "supported": true,
+          "reason": "Excerpt states: 'The failure was identified by the spacecraft as a failure of the bc_dist task to complete its execution before the bc_sched task started.'"
+        },
+        {
+          "claim": "The spacecraft treats this overrun as a fault and responds by resetting the computer.",
+          "supported": true,
+          "reason": "Excerpt: 'The reaction to this by the spacecraft was to reset the computer.'"
+        },
+        {
+          "claim": "The reset terminates the ground-commanded activities in progress.",
+          "supported": true,
+          "reason": "Excerpt: 'It also terminates the execution of the current ground commanded activities.'"
+        },
+        {
+          "claim": "This matches a reported pattern of repeated watchdog-triggered reboots.",
+          "supported": false,
+          "reason": "Excerpts mention resets and multiple resets during atmospheric entry, but do not describe a reported pattern of repeated watchdog-triggered reboots in this incident."
+        },
+        {
+          "claim": "The data distribution and bus scheduling tasks were not completing their cycles.",
+          "supported": false,
+          "reason": "Excerpts only say bc_dist did not complete before bc_sched started; they do not state bc_sched failed to complete its cycle."
+        },
+        {
+          "claim": "The excerpts do not identify why bc_dist overruns in this incident (e.g., load, timing, or software defect).",
+          "supported": true,
+          "reason": "Excerpts describe the failure and reset behavior but give no cause for the bc_dist overrun."
+        },
+        {
+          "claim": "Investigate why bc_dist is not finishing before bc_sched starts, checking execution time and timing margins under current workload.",
+          "supported": false,
+          "reason": "Generic investigative advice not stated in the excerpts."
+        },
+        {
+          "claim": "Fix the timing or scheduling overrun so bc_dist completes within its window.",
+          "supported": false,
+          "reason": "No excerpt prescribes this fix."
+        },
+        {
+          "claim": "Existing recovery mechanisms resume interrupted activities after a reset.",
+          "supported": true,
+          "reason": "Excerpt: 'We built in mechanisms to recover the current activity so that there would be no interruptions in the science data.'"
+        },
+        {
+          "claim": "Activities lost when the reset terminated them should be rescheduled, since remaining activities otherwise slip to the next day.",
+          "supported": true,
+          "reason": "Excerpt: 'the remainder of the activities for that day were not accomplished until the next day.'"
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 722,
+        "output_tokens": 527,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1452
+    },
+    {
+      "id": "q024",
+      "query": "Users can't load the web UI and can't kick off new builds; frontend calls to backend APIs are failing with CORS errors and webhook traffic has dropped off. Started roughly 90 minutes ago and still ongoing, error rates elevated across several services.",
+      "doc_id": 52,
+      "no_match": false,
+      "likely_cause": "Most likely a recent change that added a custom HTTP header to client-side requests, which triggers CORS preflight/validation failures against backend APIs. The excerpt describes a very similar past incident (GitHub Issues, May 2025) where a new custom header on all client requests caused CORS errors; the excerpts do not cover this incident's own deployment history, so this is an inference by analogy, not confirmed for this incident.",
+      "suggested_fix": "Check for recent changes that add custom headers to frontend requests and roll back the associated feature flag or deploy, as was done in the analogous incident. Verify the backend CORS configuration allows the new header. Then add monitoring for client-side request failures before re-rolling out the change gradually. The excerpts do not address the webhook drop-off or the build-trigger path directly, so those need separate investigation.",
+      "cited_doc_ids": [
+        211
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        169,
+        172,
+        211,
+        214,
+        220
+      ],
+      "agent_usage": {
+        "input_tokens": 7205,
+        "output_tokens": 811,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "A recent change added a custom HTTP header to client-side requests, which triggers CORS preflight/validation failures against backend APIs.",
+          "supported": false,
+          "reason": "The excerpt describes a past GitHub incident, not this incident; the answer itself admits this is an inference by analogy, not confirmed for this incident."
+        },
+        {
+          "claim": "In a past GitHub Issues incident in May 2025, a new custom header on all client requests caused CORS errors.",
+          "supported": true,
+          "reason": "Excerpt states: 'a new feature which added a custom header to all client-side HTTP requests, causing CORS errors when uploading attachments'."
+        },
+        {
+          "claim": "The fix is to check for recent changes that add custom headers to frontend requests and roll back the associated feature flag or deploy.",
+          "supported": true,
+          "reason": "Excerpt: 'We mitigated the incident by rolling back the feature flag that added the new header'."
+        },
+        {
+          "claim": "The backend CORS configuration should be verified to allow the new header.",
+          "supported": false,
+          "reason": "No excerpt mentions verifying or changing backend CORS configuration."
+        },
+        {
+          "claim": "Monitoring for client-side request failures should be added before re-rolling out the change gradually.",
+          "supported": true,
+          "reason": "Excerpt: 'we are adding new metrics to monitor and ensure the safe rollout of changes to client-side requests' and 'deployed an augmented version of the feature'."
+        },
+        {
+          "claim": "The excerpts do not address the webhook drop-off or the build-trigger path directly.",
+          "supported": true,
+          "reason": "The excerpt only covers the Issues attachment upload CORS incident; no mention of webhooks or build triggers."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 551,
+        "output_tokens": 363,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 799
+    },
+    {
+      "id": "q025",
+      "query": "Seeing widespread cluster connectivity failures and intermittent unavailability in one region, with elevated 5xx responses at the load balancer and rising latency. Dashboard access is also timing out for many users, and the management console is slow and erroring. Started around a maintenance window and still ongoing.",
+      "doc_id": 119,
+      "no_match": false,
+      "likely_cause": "The excerpts do not describe this incident directly. The closest match is doc_id=210, where a scheduled operating system upgrade caused uneven traffic distribution within a cluster, producing degraded availability and load-threshold problems. doc_id=171 describes intermittent connectivity between load balancers and search hosts whose retry queues overwhelmed the load balancers, which resembles the connectivity failures and 5xx errors here. doc_id=195 notes that maintenance was followed by cluster member health and shard imbalance problems. Taken together, the most plausible cause is a maintenance-triggered change (such as an OS upgrade or config change) that left cluster members unhealthy or traffic imbalanced, causing connectivity loss and retry storms at the load balancer tier. The excerpts only partly cover this: none is about a dashboard or management console incident, and none confirms the specific trigger for this event.",
+      "suggested_fix": "Pause or roll back the maintenance change and confirm it is the trigger. Check cluster member health and remove unhealthy nodes so traffic rebalances evenly. Throttle retry traffic and background pipelines (as in doc_id=171) to stop retry queues from overwhelmed load balancers. Add more network routes or capacity as a short-term relief (doc_id=210). Restore traffic only after a stable observation period with regional health and capacity checks passed (doc_id=195). Then add load-threshold and connectivity monitoring and alerting to detect this earlier.",
+      "cited_doc_ids": [
+        171,
+        210,
+        195
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        147,
+        171,
+        195,
+        209,
+        210
+      ],
+      "agent_usage": {
+        "input_tokens": 7638,
+        "output_tokens": 1005,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The excerpts do not describe this incident directly.",
+          "supported": true,
+          "reason": "None of the excerpts is about a dashboard or management console incident; each describes a different GitHub incident."
+        },
+        {
+          "claim": "doc_id=210 describes a scheduled operating system upgrade that caused uneven traffic distribution within a cluster.",
+          "supported": true,
+          "reason": "doc 210: 'caused by a scheduled operating system upgrade that resulted in unintended and uneven distribution of traffic within the cluster.'"
+        },
+        {
+          "claim": "doc_id=210 involved degraded availability and load-threshold problems.",
+          "supported": true,
+          "reason": "doc 210 mentions 'fixing gaps in our monitoring and alerting for load thresholds'; the incident lasted 7 hours 26 minutes, implying degraded availability."
+        },
+        {
+          "claim": "doc_id=171 describes intermittent connectivity between load balancers and search hosts.",
+          "supported": true,
+          "reason": "doc 171: 'intermittent connectivity issues between our load balancers and search hosts.'"
+        },
+        {
+          "claim": "In doc_id=171, retry queues overwhelmed the load balancers.",
+          "supported": true,
+          "reason": "doc 171: 'retry queues eventually overwhelmed the load balancers, causing failure.'"
+        },
+        {
+          "claim": "doc_id=171 resembles the connectivity failures and 5xx errors in this incident.",
+          "supported": false,
+          "reason": "The excerpts never mention 5xx errors or this incident; the resemblance is the answer's inference, not stated in any excerpt."
+        },
+        {
+          "claim": "doc_id=195 notes that maintenance was followed by cluster member health and shard imbalance problems.",
+          "supported": true,
+          "reason": "doc 195 mentions 'stronger regional health and capacity checks before maintenance' and 'detect and remediate unhealthy cluster members and shard imbalance.'"
+        },
+        {
+          "claim": "The most plausible cause is a maintenance-triggered change (such as an OS upgrade or config change) that left cluster members unhealthy or traffic imbalanced, causing connectivity loss and retry storms at the load balancer tier.",
+          "supported": false,
+          "reason": "This is a synthesis across three unrelated incidents; no excerpt states this combined cause for the incident in question."
+        },
+        {
+          "claim": "None of the excerpts is about a dashboard or management console incident.",
+          "supported": true,
+          "reason": "The excerpts cover search/load balancer, cluster traffic, and GitHub Actions infrastructure incidents, not a dashboard or console."
+        },
+        {
+          "claim": "None of the excerpts confirms the specific trigger for this event.",
+          "supported": true,
+          "reason": "No excerpt addresses the incident being diagnosed."
+        },
+        {
+          "claim": "Pause or roll back the maintenance change and confirm it is the trigger.",
+          "supported": false,
+          "reason": "No excerpt recommends pausing or rolling back a maintenance change."
+        },
+        {
+          "claim": "Check cluster member health and remove unhealthy nodes so traffic rebalances evenly.",
+          "supported": false,
+          "reason": "doc 195 mentions detecting and remediating unhealthy cluster members, but not removing nodes to rebalance traffic."
+        },
+        {
+          "claim": "Throttle retry traffic and background pipelines to stop retry queues from overwhelming load balancers (as in doc_id=171).",
+          "supported": true,
+          "reason": "doc 171: 'throttling our search indexing pipeline to reduce load and stabilize retries' after retry queues overwhelmed load balancers."
+        },
+        {
+          "claim": "Add more network routes or capacity as a short-term relief (doc_id=210).",
+          "supported": true,
+          "reason": "doc 210: 'A short-term strategy of increasing the number of network routes between our data centers and cloud provider helped mitigate the incident.'"
+        },
+        {
+          "claim": "Restore traffic only after a stable observation period with regional health and capacity checks passed (doc_id=195).",
+          "supported": true,
+          "reason": "doc 195: 'stronger regional health and capacity checks before maintenance, along with a required stable observation period before restoring traffic.'"
+        },
+        {
+          "claim": "Add load-threshold and connectivity monitoring and alerting to detect this earlier.",
+          "supported": true,
+          "reason": "doc 210 mentions fixing gaps in monitoring/alerting for load thresholds; doc 171 mentions improved internal monitors."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 948,
+        "output_tokens": 883,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 2217
+    },
+    {
+      "id": "q026",
+      "query": "Entire platform down for about three days; all user-facing services unavailable, including game sessions and backend service-to-service calls. Internal dashboards and monitoring also went dark, so we had almost no visibility while triaging. Full recovery took much longer than the initial failure.",
+      "doc_id": 40,
+      "no_match": false,
+      "likely_cause": "Based only on the excerpts, the evidence is thin. The one excerpt provided is a third-party outage report (PythonAnywhere, July 2020) describing an unplanned outage caused by an extremely unlikely storage system failure that led to lengthy downtime and affected many users than it should have. It does not describe our platform, its architecture, or the specific root cause of our three-day outage. The excerpt's wording suggests the failure's blast radius and recovery time were amplified beyond what the storage fault alone should have caused, which is analogous to our symptoms (wide outage, slow recovery), but this is an inference by analogy, not evidence about our incident. The fact that our monitoring also went dark suggests a shared dependency (e.g., storage or core infrastructure) may have been affected, but no excerpt confirms this.",
+      "suggested_fix": "Not determinable with confidence from the excerpts. Tentatively: investigate whether a shared storage or core infrastructure dependency failed and took down both user-facing services and internal monitoring; review whether a single failure domain propagated across services; and ensure monitoring and dashboards run on infrastructure independent of the production platform so visibility survives outages. Pull our own incident timeline, logs, and post-incident review, since the excerpts do not cover our system's actual root cause or recovery bottlenecks.",
+      "cited_doc_ids": [
+        39
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        39,
+        54,
+        84,
+        201,
+        209
+      ],
+      "agent_usage": {
+        "input_tokens": 6675,
+        "output_tokens": 1061,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The PythonAnywhere July 2020 outage report describes an unplanned outage.",
+          "supported": true,
+          "reason": "Excerpt: 'We had an unplanned outage the day before yesterday'."
+        },
+        {
+          "claim": "The PythonAnywhere outage was caused by an extremely unlikely storage system failure.",
+          "supported": true,
+          "reason": "Excerpt: 'It was caused by an extremely unlikely storage system failure'."
+        },
+        {
+          "claim": "The PythonAnywhere outage led to lengthy downtime.",
+          "supported": true,
+          "reason": "Excerpt: 'should not have led to such a lengthy downtime'."
+        },
+        {
+          "claim": "The PythonAnywhere outage affected more people than it should have.",
+          "supported": true,
+          "reason": "Excerpt: 'should not have affected so many people'."
+        },
+        {
+          "claim": "The PythonAnywhere excerpt does not describe our platform, its architecture, or the specific root cause of our three-day outage.",
+          "supported": true,
+          "reason": "The excerpt only discusses PythonAnywhere's own outage; no mention of our platform or a three-day outage."
+        },
+        {
+          "claim": "The excerpt's wording suggests the failure's blast radius and recovery time were amplified beyond what the storage fault alone should have caused.",
+          "supported": true,
+          "reason": "Excerpt: 'should not have led to such a lengthy downtime, and should not have affected so many people'."
+        },
+        {
+          "claim": "Our symptoms include a wide outage and slow recovery.",
+          "supported": false,
+          "reason": "No excerpt mentions our symptoms; this is asserted without excerpt support."
+        },
+        {
+          "claim": "Our monitoring also went dark.",
+          "supported": false,
+          "reason": "No excerpt mentions our monitoring going dark."
+        },
+        {
+          "claim": "A shared dependency (e.g., storage or core infrastructure) may have been affected in our incident.",
+          "supported": false,
+          "reason": "No excerpt states or implies this about our incident; it is inference by analogy."
+        },
+        {
+          "claim": "One should investigate whether a shared storage or core infrastructure dependency failed and took down both user-facing services and internal monitoring.",
+          "supported": false,
+          "reason": "Generic advice not stated in any excerpt."
+        },
+        {
+          "claim": "One should review whether a single failure domain propagated across services.",
+          "supported": false,
+          "reason": "Generic advice not stated in any excerpt."
+        },
+        {
+          "claim": "One should ensure monitoring and dashboards run on infrastructure independent of the production platform so visibility survives outages.",
+          "supported": false,
+          "reason": "Generic advice not stated in any excerpt."
+        },
+        {
+          "claim": "One should pull our own incident timeline, logs, and post-incident review.",
+          "supported": false,
+          "reason": "Generic advice not stated in any excerpt."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 550,
+        "output_tokens": 573,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 404
+    },
+    {
+      "id": "q027",
+      "query": "Multiple customer sites suddenly became inaccessible, with users unable to log in or reach any of their hosted tools; some accounts stayed down for days to weeks while others were restored gradually. Roughly 775 customers were affected, with no data loss beyond a few minutes.",
+      "doc_id": 113,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [
+        "answer had no valid citations or text; returning no match"
+      ],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        84,
+        113,
+        212
+      ],
+      "agent_usage": {
+        "input_tokens": 7573,
+        "output_tokens": 779,
+        "llm_calls": 4
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q028",
+      "query": "Docker, machine, and remote Docker jobs are stuck waiting or not starting at all; pipelines are delayed or blocked for hours. Anyone seeing the same across Windows, Mac, Arm, and GPU executors?",
+      "doc_id": 55,
+      "no_match": false,
+      "likely_cause": "Excerpts point to a RabbitMQ-related timeout affecting queue processing. RabbitMQ confirmed the timeout affects all queue types and a larger timeout will be applied in a future release. The excerpts do not give the full root-cause chain, the exact timeout setting name, or the detailed trigger, so this is only partly covered.",
+      "suggested_fix": "Per the excerpts, the remedy is to apply a larger RabbitMQ timeout in the next release, along with the additional documentation RabbitMQ promised about the setting. Excerpts do not describe interim mitigations or scaling changes beyond general statements about scaling the platform. Consult the full postmortem for the complete remediation plan.",
+      "cited_doc_ids": [
+        55
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        51,
+        55
+      ],
+      "agent_usage": {
+        "input_tokens": 7457,
+        "output_tokens": 775,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "The excerpts point to a RabbitMQ-related timeout affecting queue processing.",
+          "supported": true,
+          "reason": "Excerpt states RabbitMQ 'informing us that this timeout does in fact affect all queue types'."
+        },
+        {
+          "claim": "RabbitMQ confirmed the timeout affects all queue types.",
+          "supported": true,
+          "reason": "Quote: 'this timeout does in fact affect all queue types'."
+        },
+        {
+          "claim": "A larger timeout will be applied in a future release.",
+          "supported": true,
+          "reason": "Quote: 'a larger timeout will be applied ... in the next release'."
+        },
+        {
+          "claim": "The excerpts do not give the full root-cause chain.",
+          "supported": true,
+          "reason": "Excerpts only mention the RabbitMQ timeout follow-up, not a full causal chain."
+        },
+        {
+          "claim": "The excerpts do not give the exact timeout setting name.",
+          "supported": true,
+          "reason": "No setting name appears in the excerpts."
+        },
+        {
+          "claim": "The excerpts do not give the detailed trigger.",
+          "supported": true,
+          "reason": "No detailed trigger is described in the excerpts."
+        },
+        {
+          "claim": "The remedy is to apply a larger RabbitMQ timeout in the next release.",
+          "supported": true,
+          "reason": "Quote: 'a larger timeout will be applied ... in the next release'."
+        },
+        {
+          "claim": "RabbitMQ promised additional documentation about the setting.",
+          "supported": true,
+          "reason": "Quote: 'along with further documentation about this setting, in the next release'."
+        },
+        {
+          "claim": "Excerpts do not describe interim mitigations or scaling changes beyond general statements about scaling the platform.",
+          "supported": true,
+          "reason": "Excerpts only contain general statement: 'continually working to scale the CircleCI platform'."
+        },
+        {
+          "claim": "Consult the full postmortem for the complete remediation plan.",
+          "supported": false,
+          "reason": "Generic advice not stated in the excerpts."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 715,
+        "output_tokens": 415,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 1383
+    },
+    {
+      "id": "q029",
+      "query": "People were locked out of the web app and management API, and some clients stopped getting flag updates while others kept working normally. Event data ingestion slowed and some records were lost for several hours before things recovered.",
+      "doc_id": 68,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [
+        "answer had no valid citations or text; returning no match"
+      ],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        14,
+        39,
+        54,
+        59,
+        68,
+        84,
+        94,
+        211,
+        224
+      ],
+      "agent_usage": {
+        "input_tokens": 19436,
+        "output_tokens": 1097,
+        "llm_calls": 6
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q030",
+      "query": "Customers' card payments aren't reflected in their balances, so some accounts get charged repeatedly and a few get suspended; usage pricing for calls and messages is also lagging behind. Started overnight, still ongoing, affecting a small slice of accounts.",
+      "doc_id": 130,
+      "no_match": false,
+      "likely_cause": "Loss of network connectivity between the billing redis-slaves and the redis-master caused all slaves to reconnect and request full resynchronization at the same time. The resulting load made the redis-master fail, and the on-call restart of it led to billing anomalies: account balances were not updated with card payments, auto-recharges retried repeatedly, some accounts were suspended, and usage pricing was not calculated while the billing system was offline. The excerpts describe this as the Twilio July 18, 2013 incident. They do not explicitly confirm that the restart itself caused the balance-update failure, so that link is inferred from the timeline.",
+      "suggested_fix": "Take the billing system offline to stop repeated charges, then reactivate suspended accounts and refund erroneous card charges. Credit impacted accounts, and restore the billing system progressively in groups while monitoring for recurrence. For the underlying issue, prevent mass simultaneous full resynchronization of redis-slaves after a network blip, and make sure the redis-master can handle that load. The excerpts do not give a specific long-term fix, so these prevention steps are inferred.",
+      "cited_doc_ids": [
+        130
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 3,
+      "retrieved_doc_ids": [
+        63,
+        130,
+        212
+      ],
+      "agent_usage": {
+        "input_tokens": 7970,
+        "output_tokens": 797,
+        "llm_calls": 4
+      },
+      "claims": [
+        {
+          "claim": "Loss of network connectivity between the billing redis-slaves and the redis-master caused all slaves to reconnect and request full resynchronization at the same time.",
+          "supported": true,
+          "reason": "Timeline: 'We experienced a loss of network connectivity between all of our billing redis-slaves and our redis-master. This caused all redis-slaves to reconnect and request full synchronization with the master at the same time.'"
+        },
+        {
+          "claim": "The resulting load made the redis-master fail.",
+          "supported": true,
+          "reason": "'Services relying on the redis-master began to fail due to the load generated by the slave synchronization.'"
+        },
+        {
+          "claim": "The on-call restart of the redis-master led to billing anomalies.",
+          "supported": false,
+          "reason": "Timeline shows restart at 2:42 AM and anomaly detection at 3:28 AM, but no excerpt states the restart caused the anomalies; the answer itself admits this link is inferred."
+        },
+        {
+          "claim": "Account balances were not updated with card payments during the incident.",
+          "supported": true,
+          "reason": "'the account balance was not updated to reflect the payment.'"
+        },
+        {
+          "claim": "Auto-recharges were retried repeatedly.",
+          "supported": true,
+          "reason": "'the recharge was attempted multiple times as a result of the account balance not being updated'."
+        },
+        {
+          "claim": "Some accounts were suspended.",
+          "supported": true,
+          "reason": "'Some accounts were suspended as a result of a recharge attempted against a credit card deactivated by the repeated billing.'"
+        },
+        {
+          "claim": "Usage pricing was not calculated while the billing system was offline.",
+          "supported": true,
+          "reason": "'prices were not calculated for calls and message made during the duration of the incident.'"
+        },
+        {
+          "claim": "This was the Twilio July 18, 2013 incident.",
+          "supported": true,
+          "reason": "'Twilio experienced an incident with its billing system on July 18, 2013.'"
+        },
+        {
+          "claim": "The excerpts do not explicitly confirm that the restart itself caused the balance-update failure.",
+          "supported": true,
+          "reason": "No excerpt states the restart caused the balance-update failure; the timeline only shows sequence."
+        },
+        {
+          "claim": "Take the billing system offline to stop repeated charges.",
+          "supported": true,
+          "reason": "'Our billing system was taken offline to avoid additional credit card charges.'"
+        },
+        {
+          "claim": "Reactivate suspended accounts.",
+          "supported": true,
+          "reason": "'Suspended accounts were immediately reactivated.' / 'Service restored to all suspended accounts.'"
+        },
+        {
+          "claim": "Refund erroneous card charges.",
+          "supported": true,
+          "reason": "'We began processing refunds for the erroneous credit card charges.'"
+        },
+        {
+          "claim": "Credit impacted accounts.",
+          "supported": true,
+          "reason": "'All impacted accounts were given a credit equaling 10% of their last 30 days of Twilio spend.'"
+        },
+        {
+          "claim": "Restore the billing system progressively in groups while monitoring for recurrence.",
+          "supported": true,
+          "reason": "'The billing system was activated progressively for groups of customer accounts.' and monitoring detected a recurrence."
+        },
+        {
+          "claim": "Prevent mass simultaneous full resynchronization of redis-slaves after a network blip.",
+          "supported": false,
+          "reason": "No excerpt mentions this as a fix; the answer admits prevention steps are inferred."
+        },
+        {
+          "claim": "Make sure the redis-master can handle that load.",
+          "supported": false,
+          "reason": "No excerpt mentions this as a fix; the answer admits prevention steps are inferred."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1108,
+        "output_tokens": 744,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 2760
+    },
+    {
+      "id": "q031",
+      "query": "Email sending degraded \u2014 only about 80% of queued messages going out, lasting roughly a day and a half. Writes to one backend were failing and jobs piled up on app servers until disks ran low. Anyone seen similar?",
+      "doc_id": 71,
+      "no_match": false,
+      "likely_cause": "Only one excerpt is relevant, and it is a GitHub availability report, not a match for this incident in detail. Its cause was increased usage of a shared resource pool plus a separate internal job queue that became unhealthy and blocked the mailer queue, causing email delays. The excerpt does not mention writes to a backend failing, about 80% delivery, a day and a half duration, or app server disks filling. So the match is partial: both involve a shared resource and a queue that stalls email processing. The excerpt does not establish that the same mechanism caused your incident.",
+      "suggested_fix": "Based only on this excerpt, check whether the mail queue shares resources or dependencies with another internal job queue, and whether that queue is unhealthy. The report's remediations were a queue-bypass path for time-sensitive email, better anomaly detection for email delivery, and pausing the unhealthy queue to protect shared resources. The excerpt does not cover the failing backend writes or the disk exhaustion, so investigate those directly: find the failing backend, bound or shed queued job growth on app servers, and monitor disk usage.",
+      "cited_doc_ids": [
+        163
+      ],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 1,
+      "retrieved_doc_ids": [
+        51,
+        67,
+        147,
+        150,
+        153,
+        163,
+        169,
+        202,
+        203,
+        224
+      ],
+      "agent_usage": {
+        "input_tokens": 13188,
+        "output_tokens": 1103,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "Only one excerpt is relevant and it is a GitHub availability report.",
+          "supported": true,
+          "reason": "The only cited excerpt is [doc 163] 'GitHub Availability Report: April 2024'."
+        },
+        {
+          "claim": "The GitHub incident's cause was increased usage of a shared resource pool plus a separate internal job queue that became unhealthy and blocked the mailer queue, causing email delays.",
+          "supported": true,
+          "reason": "Excerpt states delays 'were caused by increased usage of a shared resource pool, and a separate internal job queue that became unhealthy and prevented the mailer queue from processing.'"
+        },
+        {
+          "claim": "The excerpt does not mention writes to a backend failing.",
+          "supported": true,
+          "reason": "No mention of backend writes failing in the excerpt."
+        },
+        {
+          "claim": "The excerpt does not mention about 80% delivery.",
+          "supported": true,
+          "reason": "No delivery percentage is stated in the excerpt."
+        },
+        {
+          "claim": "The excerpt does not mention a day and a half duration.",
+          "supported": true,
+          "reason": "Excerpt states duration of '3 days, 4 hours, 23 minutes', not a day and a half."
+        },
+        {
+          "claim": "The excerpt does not mention app server disks filling.",
+          "supported": true,
+          "reason": "No mention of disk filling in the excerpt."
+        },
+        {
+          "claim": "Both incidents involve a shared resource and a queue that stalls email processing.",
+          "supported": true,
+          "reason": "Excerpt describes shared resource pool usage and an unhealthy job queue preventing the mailer queue from processing."
+        },
+        {
+          "claim": "The excerpt does not establish that the same mechanism caused the user's incident.",
+          "supported": true,
+          "reason": "Excerpt describes a different incident (GitHub email delays) with no reference to the user's incident."
+        },
+        {
+          "claim": "Check whether the mail queue shares resources or dependencies with another internal job queue, and whether that queue is unhealthy.",
+          "supported": true,
+          "reason": "Excerpt describes shared resource pool and a separate internal job queue becoming unhealthy affecting the mailer queue."
+        },
+        {
+          "claim": "The report's remediations were a queue-bypass path for time-sensitive email, better anomaly detection for email delivery, and pausing the unhealthy queue to protect shared resources.",
+          "supported": true,
+          "reason": "Excerpt states 'a queue-bypass ability for time-sensitive emails', 'updated methods of detection for anomalous email delivery', and 'The unhealthy job queue has been paused to prevent impact to other queues using shared resources.'"
+        },
+        {
+          "claim": "The excerpt does not cover the failing backend writes or the disk exhaustion.",
+          "supported": true,
+          "reason": "No mention of backend writes or disk exhaustion in the excerpt."
+        },
+        {
+          "claim": "Investigate the failing backend directly.",
+          "supported": false,
+          "reason": "Generic advice not mentioned in the excerpt."
+        },
+        {
+          "claim": "Bound or shed queued job growth on app servers.",
+          "supported": false,
+          "reason": "Generic advice not mentioned in the excerpt."
+        },
+        {
+          "claim": "Monitor disk usage.",
+          "supported": false,
+          "reason": "Generic advice not mentioned in the excerpt."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 601,
+        "output_tokens": 662,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 952
+    },
+    {
+      "id": "q032",
+      "query": "Seeing connection timeouts and failed connects to customer-hosted apps on our own IP ranges, plus 403 'Edge IP Restricted' errors on a public resolver site. Some ranges unreachable from the internet for hours; re-advertising via dashboard fixed some but not all.",
+      "doc_id": 10,
+      "no_match": true,
+      "likely_cause": "No close match found in the indexed postmortems for this incident.",
+      "suggested_fix": "Add more detail (symptoms, affected components, recent changes) and ask again, or check the incident against sources outside the index.",
+      "cited_doc_ids": [],
+      "cited_source_doc": false,
+      "retries": 0,
+      "answer_notes": [
+        "answer had no valid citations or text; returning no match"
+      ],
+      "graded_relevant": 5,
+      "retrieved_doc_ids": [
+        10
+      ],
+      "agent_usage": {
+        "input_tokens": 8641,
+        "output_tokens": 823,
+        "llm_calls": 4
+      },
+      "claims": [],
+      "judge_usage": null,
+      "error": null
+    },
+    {
+      "id": "q033",
+      "query": "Users seeing intermittent unresponsiveness and high latency on the community site and related endpoints; browsing, uploading, and downloading content is broken or very slow, and API clients can't fetch version lists for dependency resolution. Started shortly after a major change and lasted a couple of hours.",
+      "doc_id": 116,
+      "no_match": false,
+      "likely_cause": "The excerpts describe the symptoms and timing but do not state a root cause. The incident began about two hours after Supermarket became the official community site, and it caused latency and intermittent unresponsiveness across the community site, cookbooks endpoints, and api.berkshelf.com. The excerpts do not identify the mechanism (for example, capacity, load, or a configuration change), so the cause is only partly covered; the timing suggests the load or traffic shift from the go-live change as the likely trigger.",
+      "suggested_fix": "The excerpts do not give a fix. The postmortem says corrective actions exist but does not list them. Based on the timing, review the traffic and capacity changes made when Supermarket became the official site, and confirm the root cause and corrective actions in the full postmortem, which the excerpts say is kept in a private repository.",
+      "cited_doc_ids": [
+        116
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 2,
+      "retrieved_doc_ids": [
+        67,
+        116,
+        160,
+        186,
+        203
+      ],
+      "agent_usage": {
+        "input_tokens": 13185,
+        "output_tokens": 816,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "The excerpts describe symptoms and timing but do not state a root cause.",
+          "supported": true,
+          "reason": "Excerpts describe latency/unresponsiveness and timing but no root cause is stated; the answer's own framing is consistent with the excerpts, which only give symptoms and timing."
+        },
+        {
+          "claim": "The incident began about two hours after Supermarket became the official community site.",
+          "supported": true,
+          "reason": "\"Approximately two hours after Supermarket became the official community site it started to experience increased latency\""
+        },
+        {
+          "claim": "The incident caused latency and intermittent unresponsiveness.",
+          "supported": true,
+          "reason": "\"started to experience increased latency and intermittent unresponsiveness\""
+        },
+        {
+          "claim": "The incident affected the community site, cookbooks endpoints, and api.berkshelf.com.",
+          "supported": true,
+          "reason": "\"effected various sites including supermarket.getchef.com, community.opscode.com, cookbooks.opscode.com, and api.berkshelf.com\""
+        },
+        {
+          "claim": "The excerpts do not identify the mechanism (for example, capacity, load, or a configuration change).",
+          "supported": false,
+          "reason": "Excerpts do mention mechanisms: \"App Servers Undersized\" and \"Health Check Timeouts\" and skipping \"load planning step\"."
+        },
+        {
+          "claim": "The timing suggests the load or traffic shift from the go-live change as the likely trigger.",
+          "supported": false,
+          "reason": "This is inference not stated in excerpts; excerpts attribute issues to undersized app servers, health check timeouts, and skipped load planning, not a go-live traffic shift."
+        },
+        {
+          "claim": "The excerpts do not give a fix.",
+          "supported": false,
+          "reason": "Excerpts mention corrective actions and specific issues like health check timeouts being set too low and app servers undersized, implying fixes."
+        },
+        {
+          "claim": "The postmortem says corrective actions exist but does not list them.",
+          "supported": false,
+          "reason": "Excerpts reference corrective actions and describe specific problems (health check timeouts, undersized servers, skipped load planning) that imply corrective actions."
+        },
+        {
+          "claim": "Review the traffic and capacity changes made when Supermarket became the official site.",
+          "supported": false,
+          "reason": "Generic advice not stated in excerpts; excerpts mention undersized app servers and skipped load planning but not reviewing go-live traffic changes."
+        },
+        {
+          "claim": "Confirm the root cause and corrective actions in the full postmortem, which the excerpts say is kept in a private repository.",
+          "supported": true,
+          "reason": "\"postmortem writeup, with the timeline, root cause, and corrective actions published in a private repository\""
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1237,
+        "output_tokens": 580,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 3921
+    },
+    {
+      "id": "q034",
+      "query": "Developers lost all access to our organization and its repositories, and content in several repos was altered or defaced. Pull request CI stopped testing anything but master, and existing pull requests got disconnected from their commits. Lasted about five days.",
+      "doc_id": 112,
+      "no_match": false,
+      "likely_cause": "A GitHub organization administrator account was compromised. The excerpts say various accounts were probed for vulnerable credentials from April to June 2018 (doc 112). On 2018-06-28 an attacker gained administrative access after a bad password attempt, then created a dummy admin account, removed valid users, and force-pushed malicious commits to gentoo/gentoo, gentoo/musl and gentoo/systemd (doc 112). The excerpts say GitHub located the suspected entry point in an audit log of the compromised user's account, but they do not say how the credential was obtained (for example phishing, password reuse, or missing two-factor authentication). The excerpts also do not explain why CI was limited to master or why pull requests were disconnected, beyond the fact that the force-pushes rewrote history.",
+      "suggested_fix": "Immediately revoke the compromised account's access and credentials, and remove any unauthorized accounts or admin grants. Freeze the organization and audit its membership, admin roles, and audit logs. Restore the affected repositories from the authoritative Gentoo-hosted copies, which the excerpts show did not contain the malicious commits, by force-pushing over the tampered branches. Then verify and re-sync downstream clones and CI, and reopen or rebase pull requests as needed. Longer term, enforce two-factor authentication and stronger credential hygiene for all org admins, restrict admin privileges, and monitor audit logs for unexpected admin invitations and mass removals. The excerpts do not give a full remediation or root-cause analysis, so the exact initial credential exposure should be confirmed with GitHub's audit logs.",
+      "cited_doc_ids": [
+        112
+      ],
+      "cited_source_doc": true,
+      "retries": 0,
+      "answer_notes": [],
+      "graded_relevant": 5,
+      "retrieved_doc_ids": [
+        112,
+        160,
+        162,
+        209,
+        234
+      ],
+      "agent_usage": {
+        "input_tokens": 13976,
+        "output_tokens": 1297,
+        "llm_calls": 5
+      },
+      "claims": [
+        {
+          "claim": "A GitHub organization administrator account was compromised.",
+          "supported": true,
+          "reason": "Excerpts describe attacker gaining administrative access and GitHub locking the suspected entry point found in the compromised user's account audit log."
+        },
+        {
+          "claim": "Various accounts were probed for vulnerable credentials from April to June 2018.",
+          "supported": true,
+          "reason": "Excerpt: '2018-04-08 - 2018-06-27 Logs indicate that various GitHub accounts were probed looking for vulnerable accounts.'"
+        },
+        {
+          "claim": "On 2018-06-28 an attacker gained administrative access after a bad password attempt.",
+          "supported": true,
+          "reason": "Excerpt: '20:19 Attacker tries a bad password on the account. 20:19 Attacker successfully gains administrative access'."
+        },
+        {
+          "claim": "The attacker created a dummy admin account.",
+          "supported": true,
+          "reason": "Excerpt: '20:25 Attacker creates a dummy account with administrative access.'"
+        },
+        {
+          "claim": "The attacker removed valid users.",
+          "supported": true,
+          "reason": "Excerpt: '20:25 Attacker starts removing valid users'."
+        },
+        {
+          "claim": "The attacker force-pushed malicious commits to gentoo/gentoo, gentoo/musl and gentoo/systemd.",
+          "supported": true,
+          "reason": "Excerpts list malicious commits to gentoo/gentoo (force-push), gentoo/musl (force-push), and gentoo/systemd (force-push)."
+        },
+        {
+          "claim": "GitHub located the suspected entry point in an audit log of the compromised user's account.",
+          "supported": true,
+          "reason": "Excerpt: 'GitHub locks suspected entry point ... it's found in an audit log of the compromised user's account'."
+        },
+        {
+          "claim": "The excerpts do not say how the credential was obtained (e.g., phishing, password reuse, or missing two-factor authentication).",
+          "supported": true,
+          "reason": "Excerpts only mention probing for vulnerable accounts and a bad password attempt, not the specific credential acquisition method."
+        },
+        {
+          "claim": "The excerpts do not explain why CI was limited to master or why pull requests were disconnected, beyond the force-pushes rewriting history.",
+          "supported": true,
+          "reason": "Excerpts mention force-push making downstream consumption conspicuous but do not discuss CI limited to master or PR disconnection."
+        },
+        {
+          "claim": "Immediately revoke the compromised account's access and credentials.",
+          "supported": false,
+          "reason": "Generic remediation advice; excerpts do not state this recommendation."
+        },
+        {
+          "claim": "Remove any unauthorized accounts or admin grants.",
+          "supported": false,
+          "reason": "Generic advice; excerpts describe the attacker creating dummy accounts but do not recommend removal as a fix."
+        },
+        {
+          "claim": "Freeze the organization and audit its membership, admin roles, and audit logs.",
+          "supported": false,
+          "reason": "Excerpts note GitHub froze the org and Gentoo requested audit logs, but do not present this as recommended remediation."
+        },
+        {
+          "claim": "Restore the affected repositories from the authoritative Gentoo-hosted copies, which did not contain the malicious commits, by force-pushing over the tampered branches.",
+          "supported": true,
+          "reason": "Excerpt: malicious commits 'were only present on the GitHub-hosted repositories, and never present on the Gentoo-hosted master repositories' and 'we forced-pushed over these malicious repos.'"
+        },
+        {
+          "claim": "Verify and re-sync downstream clones and CI, and reopen or rebase pull requests as needed.",
+          "supported": false,
+          "reason": "Generic advice not stated in excerpts."
+        },
+        {
+          "claim": "Enforce two-factor authentication and stronger credential hygiene for all org admins.",
+          "supported": false,
+          "reason": "Generic advice; excerpts do not mention two-factor authentication or credential hygiene recommendations."
+        },
+        {
+          "claim": "Restrict admin privileges.",
+          "supported": false,
+          "reason": "Generic advice not stated in excerpts."
+        },
+        {
+          "claim": "Monitor audit logs for unexpected admin invitations and mass removals.",
+          "supported": false,
+          "reason": "Generic advice not stated in excerpts."
+        },
+        {
+          "claim": "The excerpts do not give a full remediation or root-cause analysis, so the exact initial credential exposure should be confirmed with GitHub's audit logs.",
+          "supported": true,
+          "reason": "Excerpts lack root-cause detail on credential exposure; they note audit logs were requested and limited access provided."
+        }
+      ],
+      "judge_usage": {
+        "input_tokens": 1548,
+        "output_tokens": 936,
+        "calls": 1
+      },
+      "error": null,
+      "judge_evidence_chars": 3266
+    }
+  ]
+}

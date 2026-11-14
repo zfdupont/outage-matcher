@@ -159,3 +159,42 @@ def test_tools_against_real_index():
         found = run_tool(c, "search_incidents", {"query": "load balancer config push", "k": 3})
         assert found.content["count"] == 3
         assert found.retrieved[0].doc_id > 0
+
+
+def test_hidden_chunks_are_passed_to_search_only_when_set(monkeypatch):
+    seen = []
+
+    def fake_search(conn, query, model, k, **kwargs):
+        seen.append(kwargs)
+        return []
+
+    monkeypatch.setattr(tools, "search_chunks", fake_search)
+    tools.run_tool(ToolContext(FakeConn()), "search_incidents", {"query": "q"})
+    tools.run_tool(
+        ToolContext(FakeConn(), exclude_chunk_ids=frozenset({4, 2})),
+        "search_incidents",
+        {"query": "q"},
+    )
+    assert "exclude_chunk_ids" not in seen[0]
+    assert seen[1]["exclude_chunk_ids"] == frozenset({2, 4})
+
+
+def test_get_postmortem_leaves_out_hidden_chunks():
+    class Recording(FakeConn):
+        def __init__(self):
+            super().__init__()
+            self.chunk_queries = []
+
+        def execute(self, sql, params=()):
+            if "FROM chunks WHERE postmortem_id" in sql:
+                self.chunk_queries.append((sql, params))
+            return super().execute(sql, params)
+
+    conn = Recording()
+    tools.run_tool(ToolContext(conn), "get_postmortem", {"doc_id": 1})
+    tools.run_tool(
+        ToolContext(conn, exclude_chunk_ids=frozenset({7, 3})), "get_postmortem", {"doc_id": 1}
+    )
+    (plain_sql, plain_params), (hidden_sql, hidden_params) = conn.chunk_queries
+    assert "<> ALL" not in plain_sql and plain_params == (1,)
+    assert "id <> ALL(%s::int[])" in hidden_sql and hidden_params == (1, [3, 7])
