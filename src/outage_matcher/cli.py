@@ -1,4 +1,4 @@
-"""Command line entry point: `outage-matcher ingest`, `search` and `ask`."""
+"""Command line entry point: `outage-matcher ingest`, `search`, `ask` and `serve`."""
 
 from __future__ import annotations
 
@@ -120,13 +120,29 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def serve_agent_factory():
+    """Agent for the API, or None (so `/ask` answers 503) when there is no real API key."""
+    from outage_matcher.api.agent import ApiAgent
+
+    api_key = _api_key()
+    if api_key is None:
+        _log(
+            "ANTHROPIC_API_KEY is not set (or is still the .env.example placeholder); "
+            "POST /ask will answer 503 until a real key is configured."
+        )
+        return None
+    config = load_config()
+    client = _make_client(api_key, config)
+    return ApiAgent(lambda conn: _build_agent(conn, client, config))
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
     from outage_matcher.api.app import create_app
 
     load_dotenv()  # Langfuse keys come from .env in local runs
-    uvicorn.run(create_app(), host=args.host, port=args.port)
+    uvicorn.run(create_app(serve_agent_factory), host=args.host, port=args.port)
     return 0
 
 
