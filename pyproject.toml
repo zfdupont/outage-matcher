@@ -7,7 +7,11 @@ authors = [
     { name = "zfdupont", email = "zachary.dupont311@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pgvector>=0.5.1",
+    "psycopg[binary]>=3.3.9",
+    "python-dotenv>=1.2.4",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]
@@ -28,3 +32,8 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not network and not db'"
+markers = [
+    "network: needs internet access (skipped by default)",
+    "db: needs a running Postgres with pgvector (skipped by default)",
+]
