@@ -51,15 +51,26 @@
 
 **Observable:** `uv run python -m outage_matcher.evals.run_retrieval --help` and the committed results show recall@k and MRR for each configuration.
 
-## M4. Ops
+## M2b. Ops skeleton
 
-**Goal:** tracing, CI regression gate, API, container.
+**Goal:** the deployable shell around the agent, built in parallel with M2 on files M2 does not touch (api/, observability.py, Dockerfile, compose api service, CI lint/test workflow). Do not touch `src/outage_matcher/agent/`, `config.py` or ingest code.
 
 **Steps:**
-1. Langfuse tracing: instrument each LangGraph node and each tool call (use the Langfuse Python SDK callback handler); tracing is a no-op when keys are unset. Test that the agent runs with tracing disabled.
-2. FastAPI app `src/outage_matcher/api/app.py`: `POST /ask` (typed request/response with answer, cause, fix, citations with urls), `GET /health`. Tests with the TestClient and a fake agent. CLI `outage-matcher serve`.
-3. `.github/workflows/eval.yml`: on pull requests run lint, tests, then start a pgvector service container, run ingest from the manifest, run the retrieval eval and compare with `evals/baseline.json`, failing the job when recall@k or MRR drops beyond the tolerance. The LLM-judged faithfulness job runs only on `workflow_dispatch` or when the `ANTHROPIC_API_KEY` secret is present. Secrets come only from GitHub secrets. `[ESCALATE: new CI workflow that handles secrets, owner should read it before merge]`
-4. `Dockerfile` multi-stage with uv, non-root user, `HEALTHCHECK` hitting `/health`; extend `docker-compose.yml` with the `api` service (env via references, depends_on db healthy). Build the image and run the container, confirm the healthcheck turns healthy.
-5. Update README (setup, architecture diagram in text, commands, results section kept from M3), CLAUDE.md Architecture to match the final layout, and `docs/` notes for tracing.
+1. Add `fastapi`, `uvicorn` and `langfuse` with `uv add`. Define in `src/outage_matcher/api/models.py` the typed `AskRequest` and `AskResponse` (answer, likely_cause, suggested_fix, citations with doc id, title, url, section) and in `api/app.py` a `Protocol` `Agent` with `ask(question) -> AskResponse`; the app takes an agent factory so tests inject a fake. `POST /ask`, `GET /health`, errors as JSON with proper status codes and no stack traces. Until M4 wires the real agent, a missing agent returns 503. Tests with TestClient. CLI `outage-matcher serve`.
+2. `src/outage_matcher/observability.py`: `get_tracer()` returns a Langfuse callback handler when `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, else None (no-op), with tests for both cases and a `trace_span` helper usable as a decorator.
+3. `Dockerfile` multi-stage with uv, non-root user, `HEALTHCHECK` hitting `/health`; extend `docker-compose.yml` with an `api` service (env via `${...}` references, depends_on db healthy). Build the image and run the container with the db, confirm the healthcheck turns healthy and `GET /health` answers.
+4. `.github/workflows/ci.yml`: lint, format check and tests on pull requests and pushes with uv; no secrets needed. (The eval gate comes in M4.)
+
+**Observable:** `docker compose up --build` serves `GET /health`; `POST /ask` returns 503 until the agent is wired.
+
+## M4. Ops
+
+**Goal:** wire everything together: real agent in the API, Langfuse tracing of each agent step, CI eval gate. Depends on M2, M2b and M3 being merged.
+
+**Steps:**
+1. Wire the LangGraph agent into the API factory (`POST /ask` calls the real agent) and the `serve` command; keep the fake-agent tests.
+2. Langfuse tracing: use `observability.get_tracer()` as a callback on the graph and wrap each tool call and node in a span; tracing stays a no-op when keys are unset; test the agent with tracing disabled.
+3. `.github/workflows/eval.yml`: on pull requests start a pgvector service container, run ingest from the manifest, run the retrieval eval and compare with `evals/baseline.json`, failing the job when recall@k or MRR drops beyond the tolerance. The LLM-judged faithfulness job runs only on `workflow_dispatch` or when the `ANTHROPIC_API_KEY` secret is present. Secrets come only from GitHub secrets. `[ESCALATE: CI workflow that handles secrets, owner should read it before merge]`
+4. Update README (setup, text architecture diagram, commands, results section kept from M3), CLAUDE.md Architecture to match the final layout, and a short tracing note under `docs/`. Run `docker compose up --build` once more with the real agent and confirm `/health` and a `/ask` request (needs the API key).
 
 **Observable:** `docker compose up --build` serves `POST /ask` and `GET /health`; Langfuse shows a trace per agent step when keys are configured.
