@@ -80,6 +80,21 @@
    "history": [],
    "note": "",
    "updated": "2026-11-14T04:33:36.662638+00:00"
+  },
+  {
+   "id": "004-m3-evals",
+   "title": "M3 evals",
+   "branch": "factory/004-m3-evals",
+   "worktree": "/Users/zfdupont/outage-matcher-factory/004-m3-evals",
+   "builder": "",
+   "lane": "milestone",
+   "stage": "build",
+   "round": 1,
+   "rework": 0,
+   "reviews": {},
+   "history": [],
+   "note": "",
+   "updated": "2026-11-14T04:39:23.178316+00:00"
   }
  ]
 }
