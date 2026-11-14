@@ -116,10 +116,17 @@ class AgentState(TypedDict):
     answer: AgentAnswer | None
 
 
-def _block_dict(block: Any) -> dict[str, Any]:
-    if block.type == "tool_use":
-        return {"type": "tool_use", "id": block.id, "name": block.name, "input": block.input}
-    return {"type": "text", "text": getattr(block, "text", "")}
+def _echo_blocks(content: list[Any]) -> list[dict[str, Any]]:
+    """Assistant blocks to send back. The API rejects empty text blocks, so those are skipped."""
+    blocks: list[dict[str, Any]] = []
+    for block in content:
+        if block.type == "tool_use":
+            blocks.append(
+                {"type": "tool_use", "id": block.id, "name": block.name, "input": block.input}
+            )
+        elif (getattr(block, "text", "") or "").strip():
+            blocks.append({"type": "text", "text": block.text})
+    return blocks
 
 
 def _chunk_key(chunk: RetrievedChunk) -> tuple[int, str, str]:
@@ -204,9 +211,7 @@ class OutageAgent:
             calls = [b for b in response.content if b.type == "tool_use"]
             if not calls:
                 break
-            messages.append(
-                {"role": "assistant", "content": [_block_dict(b) for b in response.content]}
-            )
+            messages.append({"role": "assistant", "content": _echo_blocks(response.content)})
             results = []
             for call in calls:
                 result = run_tool(self.ctx, call.name, call.input)

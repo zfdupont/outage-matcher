@@ -321,3 +321,31 @@ def test_model_mistakes_are_not_backend_failures(search_log):
     )
     result = make_agent(client, max_retries=0).ask(QUESTION)
     assert result.answer.no_match  # invalid arguments stay a normal no-match, no exception
+
+
+def test_empty_text_blocks_are_not_echoed_back_to_the_api(search_log):
+    client = FakeAnthropic(
+        retrieve=[
+            response(
+                text_block(""), text_block("  "), tool_block("search_incidents", {"query": "q"})
+            ),
+            response(text_block("ok")),
+        ],
+        submit_grades=[grades(False, False)],
+    )
+    make_agent(client, max_retries=0).ask(QUESTION)
+    echoed = client.calls_for("retrieve")[1]["messages"][1]["content"]
+    assert [b["type"] for b in echoed] == ["tool_use"]
+
+
+def test_non_empty_text_blocks_are_echoed(search_log):
+    client = FakeAnthropic(
+        retrieve=[
+            response(text_block("searching"), tool_block("search_incidents", {"query": "q"})),
+            response(text_block("ok")),
+        ],
+        submit_grades=[grades(False, False)],
+    )
+    make_agent(client, max_retries=0).ask(QUESTION)
+    echoed = client.calls_for("retrieve")[1]["messages"][1]["content"]
+    assert [b["type"] for b in echoed] == ["text", "tool_use"]
