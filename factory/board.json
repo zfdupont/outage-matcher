@@ -101,6 +101,21 @@
    "history": [],
    "note": "",
    "updated": "2026-11-14T05:53:23.280277+00:00"
+  },
+  {
+   "id": "005-m4-ops",
+   "title": "M4 ops",
+   "branch": "factory/005-m4-ops",
+   "worktree": "/Users/zfdupont/outage-matcher-factory/005-m4-ops",
+   "builder": "",
+   "lane": "milestone",
+   "stage": "build",
+   "round": 1,
+   "rework": 0,
+   "reviews": {},
+   "history": [],
+   "note": "",
+   "updated": "2026-11-14T05:53:45.403978+00:00"
   }
  ]
 }
