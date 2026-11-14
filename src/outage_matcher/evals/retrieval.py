@@ -45,11 +45,6 @@ class Corpus:
             raise ValueError(f"document {doc_id} has no chunks at positions {sorted(ords)}")
         return indices
 
-    def doc_range(self, doc_id: int) -> tuple[int, int]:
-        """Start and end (exclusive) flat index of one document's chunks."""
-        indices = np.flatnonzero(self.doc_ids == doc_id)
-        return int(indices[0]), int(indices[-1]) + 1
-
 
 def build_corpus(docs: list[DocRow], vectors: dict[int, np.ndarray], model: str) -> Corpus:
     """Assemble a corpus from documents and a chunk id to vector map."""
@@ -88,6 +83,7 @@ class ChunkingStrategy(Protocol):
     """How chunks are embedded for retrieval. The text shown to readers is always the chunk."""
 
     name: str
+    params: dict[str, object]  # settings recorded in result files
 
     def matrix(self, corpus: Corpus, embedder: Embedder) -> np.ndarray: ...
 
@@ -102,6 +98,7 @@ class SectionChunking:
     """The indexed chunks as stored: one embedding per section-typed chunk."""
 
     name = "section"
+    params: dict[str, object] = {}
 
     def matrix(self, corpus: Corpus, embedder: Embedder) -> np.ndarray:
         return corpus.embeddings

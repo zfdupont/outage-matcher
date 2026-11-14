@@ -22,8 +22,10 @@ from typing import Any
 from outage_matcher import db
 from outage_matcher.evals import corpus as corpus_mod
 from outage_matcher.evals import metrics
+from outage_matcher.evals.chunking import CACHE_DIR, CHUNKINGS, make_chunking
 from outage_matcher.evals.gold import GOLD_PATH, GoldQuery, read_gold
-from outage_matcher.evals.retrieval import Retriever, load_corpus
+from outage_matcher.evals.rerank import DEFAULT_RERANKER, FastEmbedReranker
+from outage_matcher.evals.retrieval import RERANK_DEPTH, Retriever, load_corpus
 from outage_matcher.ingest.embed import MODELS, get_embedder
 
 RESULTS_DIR = Path("evals/results")
@@ -138,7 +140,21 @@ def format_metrics(values: dict[str, float]) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="run_retrieval", description=__doc__.split("\n\n")[0])
     parser.add_argument("--model", choices=sorted(MODELS), required=True, help="embedding model")
-    parser.add_argument("--chunking", default="section", help="chunking strategy (default section)")
+    parser.add_argument(
+        "--chunking",
+        choices=CHUNKINGS,
+        default="section",
+        help="section: the indexed chunks; neighbor: each chunk embedded with adjacent context",
+    )
+    parser.add_argument(
+        "--reranker",
+        nargs="?",
+        const=DEFAULT_RERANKER,
+        metavar="MODEL",
+        help=f"rerank the top chunks with a fastembed cross-encoder (default {DEFAULT_RERANKER})",
+    )
+    parser.add_argument("--rerank-depth", type=int, default=RERANK_DEPTH, help="chunks reranked")
+    parser.add_argument("--cache-dir", type=Path, default=CACHE_DIR, help="embedding cache")
     parser.add_argument("--gold", type=Path, default=GOLD_PATH)
     parser.add_argument("--name", help="run name (default: derived from the configuration)")
     parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
@@ -153,7 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    name = args.name or run_name(args.model, args.chunking, None)
+    name = args.name or run_name(args.model, args.chunking, args.reranker)
     out = args.results_dir / f"{name}.json"
     if out.exists() and not args.force:
         _log(f"{out} exists; pass --force to replace it")
@@ -164,12 +180,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.allow_index_mismatch:
             check_gold_matches_index(gold, info)
         corpus = load_corpus(conn, args.model)
-    retriever = Retriever(corpus, get_embedder(args.model))
+    chunking = make_chunking(args.chunking, args.cache_dir)
+    reranker = FastEmbedReranker(args.reranker) if args.reranker else None
+    retriever = Retriever(
+        corpus, get_embedder(args.model), chunking, reranker, rerank_depth=args.rerank_depth
+    )
     config = {
         "embedding_model": args.model,
         "embedding_model_name": MODELS[args.model],
-        "chunking": retriever.chunking.name,
-        "reranker": None,
+        "chunking": chunking.name,
+        "chunking_params": chunking.params,
+        "reranker": args.reranker,
+        "rerank_depth": args.rerank_depth if args.reranker else None,
         "search": SEARCH_DESCRIPTION,
     }
     results = evaluate(gold, retriever)
