@@ -14,3 +14,8 @@
 ## Follow-ups from job 002-m2-agent
 - [ ] Record 3 real example transcripts under docs/examples/ and verify the default model name and tool_choice against the live API (needs ANTHROPIC_API_KEY)
 - [ ] Annotate _env_number in src/outage_matcher/agent/config.py
+
+## Follow-ups from job 004-m3-evals
+- [ ] Investigate the 5 unexplained abstentions (q006, q009, q027, q029, q032) in evals/results/faithfulness.json
+- [ ] Repeat the faithfulness run several times and report a mean and spread (evals/run_faithfulness.py)
+- [ ] Strip dashes from gold queries only if the whole eval is rerun (evals/gold.jsonl)
