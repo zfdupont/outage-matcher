@@ -53,6 +53,24 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_fetch_raw(args: argparse.Namespace) -> int:
+    entries = collect_mod.read_manifest()
+    if not entries:
+        _log("no manifest found at data/manifest.jsonl")
+        return 1
+    report = collect_mod.fetch_missing_pages(entries, log=_log)
+    print(
+        f"manifest {len(entries)} pages: {report.present} already in data/raw, "
+        f"{report.fetched} fetched, {len(report.failures)} not fetched"
+    )
+    if report.failures:
+        _log(
+            f"warning: {len(report.failures)} pages could not be fetched, so the index built "
+            "from data/raw will differ from the one the baseline was recorded on."
+        )
+    return 1 if report.failures and args.strict else 0
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     models = [args.model] if args.model else list(MODELS)
     with db.connect() as conn:
@@ -165,6 +183,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-collect", action="store_true", help="reuse data/manifest.jsonl and data/raw"
     )
     ingest.set_defaults(func=cmd_ingest)
+
+    fetch = sub.add_parser(
+        "fetch-raw", help="fetch the manifest's pages that are missing from data/raw"
+    )
+    fetch.add_argument("--strict", action="store_true", help="exit 1 if any page is not fetched")
+    fetch.set_defaults(func=cmd_fetch_raw)
 
     find = sub.add_parser("search", help="search indexed postmortems")
     find.add_argument("query")
