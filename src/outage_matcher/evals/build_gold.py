@@ -209,7 +209,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 held = sum(len(c.text) for c in doc.root_cause_chunks)
                 print(f"{doc.id}\t{doc.source}\t{held} root-cause chars\t{doc.title}")
             return 0
-        client = deepseek.DeepSeekClient(key)
+        client = deepseek.DeepSeekClient(key, model=deepseek.model_id())
         rows, stats = build_gold(
             docs,
             client,

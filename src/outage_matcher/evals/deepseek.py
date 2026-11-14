@@ -13,7 +13,7 @@ import httpx
 from dotenv import load_dotenv
 
 BASE_URL = "https://api.deepseek.com"
-MODEL = "deepseek-chat"
+DEFAULT_MODEL = "deepseek-flash"  # the one id containing "flash" in GET /models (2026-11-14)
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
@@ -48,6 +48,12 @@ class ChatResult:
     usage: TokenUsage
 
 
+def model_id() -> str:
+    """DEEPSEEK_MODEL from the environment or .env, else the default flash model."""
+    load_dotenv()
+    return (os.environ.get("DEEPSEEK_MODEL") or "").strip() or DEFAULT_MODEL
+
+
 def api_key() -> str | None:
     """DEEPSEEK_API_KEY from the environment or .env; empty or `your-...` placeholder is unset."""
     load_dotenv()
@@ -60,7 +66,7 @@ class DeepSeekClient:
         self,
         key: str,
         *,
-        model: str = MODEL,
+        model: str = DEFAULT_MODEL,
         base_url: str = BASE_URL,
         http: httpx.Client | None = None,
         timeout: float = 90.0,
@@ -105,6 +111,9 @@ class DeepSeekClient:
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                # The flash model reasons by default, which spends max_tokens and ignores
+                # temperature; plain replies keep temperature 0 meaningful for the judge.
+                "thinking": {"type": "disabled"},
                 "response_format": {"type": "json_object"},
             }
         )

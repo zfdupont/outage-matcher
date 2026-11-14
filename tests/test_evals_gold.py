@@ -26,7 +26,7 @@ def make_doc(doc_id=1, title="Edge outage", url="https://blog.examplecdn.test/a"
 class FakeDeepSeek:
     """Scripted chat_json: each call pops the next reply (a dict or an exception)."""
 
-    model = "deepseek-chat"
+    model = "deepseek-flash"
 
     def __init__(self, *replies):
         self.replies = list(replies)
@@ -197,7 +197,7 @@ def test_build_gold_records_doc_held_out_section_and_generation(tmp_path):
     assert row.held_out_heading == "Root cause"
     assert row.index_version == "abc123"
     assert row.generation == {
-        "model": "deepseek-chat",
+        "model": "deepseek-flash",
         "temperature": 0.2,
         "date": "2026-11-14",
         "seed": 0,

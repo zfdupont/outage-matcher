@@ -34,7 +34,8 @@ def test_chat_json_sends_json_mode_request_and_parses_reply():
     assert seen["url"] == "https://api.deepseek.com/chat/completions"
     assert seen["auth"] == "Bearer k-test"
     body = seen["body"]
-    assert body["model"] == "deepseek-chat"
+    assert body["model"] == "deepseek-flash"
+    assert body["thinking"] == {"type": "disabled"}
     assert body["temperature"] == 0.0
     assert body["response_format"] == {"type": "json_object"}
 
@@ -104,3 +105,15 @@ def test_api_key_ignores_missing_and_placeholder(monkeypatch, value, expected):
     else:
         monkeypatch.setenv("DEEPSEEK_API_KEY", value)
     assert deepseek.api_key() == expected
+
+
+@pytest.mark.parametrize(
+    "value, expected", [(None, "deepseek-flash"), ("", "deepseek-flash"), ("other", "other")]
+)
+def test_model_id_defaults_to_flash_and_can_be_overridden(monkeypatch, value, expected):
+    monkeypatch.setattr(deepseek, "load_dotenv", lambda: False)
+    if value is None:
+        monkeypatch.delenv("DEEPSEEK_MODEL", raising=False)
+    else:
+        monkeypatch.setenv("DEEPSEEK_MODEL", value)
+    assert deepseek.model_id() == expected

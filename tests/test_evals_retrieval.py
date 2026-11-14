@@ -99,7 +99,7 @@ def gold_row(row_id, doc_id, query, ords, confirmed_near=()):
         held_out_ords=ords,
         held_out_heading="Root cause",
         index_version="v1",
-        generation={"model": "deepseek-chat", "temperature": 0.2, "date": "2026-11-14"},
+        generation={"model": "deepseek-flash", "temperature": 0.2, "date": "2026-11-14"},
         notes="",
         near_duplicates=[NearDuplicate(d, "t", "u", "r", confirmed=True) for d in confirmed_near],
     )
@@ -168,7 +168,7 @@ def test_main_writes_a_result_file_with_config_index_and_per_query_ranks(tmp_pat
     assert document["config"]["reranker"] is None
     assert document["index"] == {"version": "v1", "documents": 3, "chunks": 7}
     assert document["gold"]["queries"] == 2
-    assert document["gold"]["generation"]["model"] == "deepseek-chat"
+    assert document["gold"]["generation"]["model"] == "deepseek-flash"
     assert set(document["metrics"]) == {"recall@1", "recall@3", "recall@5", "recall@10", "mrr"}
     assert [q["id"] for q in document["per_query"]] == ["q001", "q002"]
     assert all(q["rank"] is not None for q in document["per_query"])

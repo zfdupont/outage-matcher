@@ -26,7 +26,7 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 `src/outage_matcher/`: ingest (collect, chunk, embed, index), search, config, agent (`tools.py`, `graph.py` LangGraph retrieve/grade/rewrite/answer, `transcript.py`), evals, api. Eval gold set under `evals/`.
 
 ## Environment Variables
-ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, VOYAGE_API_KEY, OPENAI_API_KEY, DATABASE_URL, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT, API_PORT, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, VOYAGE_API_KEY, OPENAI_API_KEY, DATABASE_URL, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT, API_PORT, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
 
 ## Rules
 - Never commit secrets or `.env`. No Co-Authored-By lines. No emojis or em-dashes. Brief commit messages.
