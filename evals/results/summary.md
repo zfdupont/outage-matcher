@@ -27,8 +27,17 @@ Baseline: **bge, section chunking** (highest MRR of the models above).
 ## Faithfulness (LLM judge)
 
 - Agent: claude-haiku-5-5 (Anthropic). Judge: deepseek-flash (DeepSeek, a different model family), temperature 0.0. Run on 2026-11-13.
-- Queries: 34; judged answers: 19; abstained (no close match): 15; errors: 0.
-- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 11 of 15.
-- Claims supported by the cited chunks: 147 of 219 (0.671).
-- Answers with every claim supported: 0.000.
-- Tokens: agent 389307 in / 35072 out, judge 13865 in / 11534 out.
+- Queries: 34; judged answers: 27; abstained (no close match): 7; errors: 0.
+- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 0 of 7.
+- Claims supported by the cited chunks: 239 of 336 (0.711).
+- Answers with every claim supported: 0.037.
+- Tokens: agent 376959 in / 34754 out, judge 22753 in / 17458 out.
+
+### Before and after the citation-prompt fix
+
+The earlier run (`faithfulness-prefix-bug.json`) used the answer prompt that listed excerpts as `[0] doc_id=...`; the model often cited the position instead of the doc_id and the citation check turned those answers into abstentions. The current run labels excerpts by doc_id only.
+
+| Run | answers judged | abstained | claims supported | claim support | answers with every claim supported |
+| --- | --- | --- | --- | --- | --- |
+| before the fix (2026-11-13) | 19 of 34 | 15 | 147 of 219 | 0.671 | 0.000 |
+| after the fix (2026-11-13) | 27 of 34 | 7 | 239 of 336 | 0.711 | 0.037 |

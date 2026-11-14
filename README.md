@@ -104,20 +104,31 @@ Baseline: **bge, section chunking** (highest MRR of the models above).
 ### Faithfulness (LLM judge)
 
 - Agent: claude-haiku-5-5 (Anthropic). Judge: deepseek-flash (DeepSeek, a different model family), temperature 0.0. Run on 2026-11-13.
-- Queries: 34; judged answers: 19; abstained (no close match): 15; errors: 0.
-- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 11 of 15.
-- Claims supported by the cited chunks: 147 of 219 (0.671).
-- Answers with every claim supported: 0.000.
-- Tokens: agent 389307 in / 35072 out, judge 13865 in / 11534 out.
+- Queries: 34; judged answers: 27; abstained (no close match): 7; errors: 0.
+- Abstentions where every citation named a document that was not retrieved (the citation check dropped it): 0 of 7.
+- Claims supported by the cited chunks: 239 of 336 (0.711).
+- Answers with every claim supported: 0.037.
+- Tokens: agent 376959 in / 34754 out, judge 22753 in / 17458 out.
+
+#### Before and after the citation-prompt fix
+
+The earlier run (`faithfulness-prefix-bug.json`) used the answer prompt that listed excerpts as `[0] doc_id=...`; the model often cited the position instead of the doc_id and the citation check turned those answers into abstentions. The current run labels excerpts by doc_id only.
+
+| Run | answers judged | abstained | claims supported | claim support | answers with every claim supported |
+| --- | --- | --- | --- | --- | --- |
+| before the fix (2026-11-13) | 19 of 34 | 15 | 147 of 219 | 0.671 | 0.000 |
+| after the fix (2026-11-13) | 27 of 34 | 7 | 239 of 336 | 0.711 | 0.037 |
 
 Reading these numbers: faithfulness here means each claim is supported by the chunks the answer
 cites; it is not correctness against the held-out root cause. The judge is strict, so generic advice
-that no excerpt mentions counts as unsupported, which is why no answer has every claim supported.
-Most abstentions are not retrieval misses: the model cited excerpt numbers instead of document ids,
-the citation check dropped them, and the agent returned "no close match" (see
-`docs/examples/db-failover-split-brain.md`). The scored answers are the 19 that kept a valid
-citation, so the rates above describe that subset only. The agent is nondeterministic and the
-figures come from one run.
+that no excerpt mentions counts as unsupported, which is why almost no answer has every claim
+supported. The first run exposed an agent bug: the answer prompt listed excerpts as `[0] doc_id=...`,
+the model cited those positions, the citation check dropped them and the agent abstained. The prompt
+now labels excerpts by doc_id only (the citation check is unchanged), and the before and after rows
+above come from `faithfulness-prefix-bug.json` and `faithfulness.json`. The remaining abstentions
+are rows in the result file with no relevant retrieval or no citations in the model's answer. The
+rates describe only the answers that were judged, and the agent is nondeterministic, so each figure
+comes from one run.
 
 ### Limitations
 
