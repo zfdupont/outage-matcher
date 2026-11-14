@@ -254,7 +254,7 @@ class OutageAgent:
                 "type": "grade",
                 "graded": len(pending),
                 "relevant": len(relevant),
-                "malformed": grades is None,
+                "malformed": not isinstance(grades, list),
             }
         )
         return {
