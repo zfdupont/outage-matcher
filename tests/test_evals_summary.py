@@ -133,6 +133,7 @@ def test_baseline_document_states_the_tolerance_and_ties_to_gold_and_index(resul
     assert doc["run"] == "bge-section" and doc["tolerance"] == 0.05
     assert doc["metrics"]["recall@1"] == 0.25 and set(doc["metrics"]) == set(summary.METRIC_KEYS)
     assert doc["gold_sha256"] == "g1" * 12 and doc["index_version"] == "i1"
+    assert (doc["index_documents"], doc["index_chunks"]) == (3, 9)
 
 
 def test_main_writes_summary_and_baseline(results, tmp_path):

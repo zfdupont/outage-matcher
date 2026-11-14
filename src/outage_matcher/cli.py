@@ -1,4 +1,4 @@
-"""Command line entry point: `outage-matcher ingest`, `search` and `ask`."""
+"""Command line entry point: `outage-matcher ingest`, `search`, `ask` and `serve`."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 import psycopg
 from dotenv import load_dotenv
 
-from outage_matcher import db
+from outage_matcher import db, observability
 from outage_matcher.config import load_config
 from outage_matcher.ingest import collect as collect_mod
 from outage_matcher.ingest import index as index_mod
@@ -51,6 +51,24 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     print(f"failures: collect {len(failures)}, parse {len(parse_failures)}")
     print(json.dumps({"per_source": stats["per_source"]}))
     return 0
+
+
+def cmd_fetch_raw(args: argparse.Namespace) -> int:
+    entries = collect_mod.read_manifest()
+    if not entries:
+        _log("no manifest found at data/manifest.jsonl")
+        return 1
+    report = collect_mod.fetch_missing_pages(entries, log=_log)
+    print(
+        f"manifest {len(entries)} pages: {report.present} already in data/raw, "
+        f"{report.fetched} fetched, {len(report.failures)} not fetched"
+    )
+    if report.failures:
+        _log(
+            f"warning: {len(report.failures)} pages could not be fetched, so the index built "
+            "from data/raw will differ from the one the baseline was recorded on."
+        )
+    return 1 if report.failures and args.strict else 0
 
 
 def cmd_search(args: argparse.Namespace) -> int:
@@ -110,6 +128,8 @@ def cmd_ask(args: argparse.Namespace) -> int:
     except anthropic.APIError as exc:  # network, auth, rate limit or bad model name
         _log(f"error: Anthropic API call failed: {exc}")
         return 1
+    finally:
+        observability.flush()
     print(transcript.render_answer(result))
     print(transcript.render_usage(result))
     if args.transcript:
@@ -120,13 +140,29 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def serve_agent_factory():
+    """Agent for the API, or None (so `/ask` answers 503) when there is no real API key."""
+    from outage_matcher.api.agent import ApiAgent
+
+    api_key = _api_key()
+    if api_key is None:
+        _log(
+            "ANTHROPIC_API_KEY is not set (or is still the .env.example placeholder); "
+            "POST /ask will answer 503 until a real key is configured."
+        )
+        return None
+    config = load_config()
+    client = _make_client(api_key, config)
+    return ApiAgent(lambda conn: _build_agent(conn, client, config))
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
     from outage_matcher.api.app import create_app
 
     load_dotenv()  # Langfuse keys come from .env in local runs
-    uvicorn.run(create_app(), host=args.host, port=args.port)
+    uvicorn.run(create_app(serve_agent_factory), host=args.host, port=args.port)
     return 0
 
 
@@ -147,6 +183,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-collect", action="store_true", help="reuse data/manifest.jsonl and data/raw"
     )
     ingest.set_defaults(func=cmd_ingest)
+
+    fetch = sub.add_parser(
+        "fetch-raw", help="fetch the manifest's pages that are missing from data/raw"
+    )
+    fetch.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 unless every manifest page is in data/raw afterwards",
+    )
+    fetch.set_defaults(func=cmd_fetch_raw)
 
     find = sub.add_parser("search", help="search indexed postmortems")
     find.add_argument("query")

@@ -1,7 +1,7 @@
 """FastAPI app: `POST /ask` and `GET /health`.
 
-The app takes an agent factory so tests can inject a fake. Until the real agent is wired in
-(M4), the default factory returns None and `/ask` answers 503.
+The app takes an agent factory so tests can inject a fake. `outage-matcher serve` passes the
+factory for the real agent; the default factory returns None and `/ask` then answers 503.
 """
 
 from __future__ import annotations
@@ -10,11 +10,14 @@ import logging
 from collections.abc import Callable
 from typing import Protocol
 
+import anthropic
+import psycopg
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from outage_matcher.agent.models import RetrievalError
 from outage_matcher.api.models import AskRequest, AskResponse
 
 logger = logging.getLogger(__name__)
@@ -28,7 +31,7 @@ AgentFactory = Callable[[], Agent | None]
 
 
 def no_agent() -> Agent | None:
-    """Default factory until the real agent is wired in."""
+    """Default factory: no agent, so `/ask` answers 503."""
     return None
 
 
@@ -71,6 +74,21 @@ def create_app(agent_factory: AgentFactory = no_agent) -> FastAPI:
     @app.exception_handler(StarletteHTTPException)
     async def on_http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         return _error(exc.status_code, str(exc.detail))
+
+    @app.exception_handler(RetrievalError)
+    async def on_retrieval_error(_: Request, exc: RetrievalError) -> JSONResponse:
+        logger.error("search backend failed: %s", exc)
+        return _error(503, "search backend unavailable")
+
+    @app.exception_handler(psycopg.OperationalError)
+    async def on_database_error(_: Request, exc: psycopg.OperationalError) -> JSONResponse:
+        logger.error("database unavailable: %s", exc)
+        return _error(503, "search backend unavailable")
+
+    @app.exception_handler(anthropic.APIError)
+    async def on_model_error(_: Request, exc: anthropic.APIError) -> JSONResponse:
+        logger.error("model API call failed: %s", exc)
+        return _error(502, "model API call failed")
 
     @app.exception_handler(Exception)
     async def on_unhandled(_: Request, exc: Exception) -> JSONResponse:

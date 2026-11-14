@@ -2,12 +2,104 @@
 
 RAG agent that takes a description of an incident, finds similar past outages from public postmortems, and returns a likely cause and fix with citations.
 
-Status: M1 (ingest and index), M2 (agent) and M3 (evals) are built. Every number below comes from a recorded run in `evals/results/`.
+Status: M1 (ingest and index), M2 (agent), M3 (evals) and M4 (API, tracing, CI gate) are built. Every number below comes from a recorded run in `evals/results/`.
 
 ## Setup
 
+Needs [uv](https://docs.astral.sh/uv/) and Docker. Python 3.12 is installed by uv.
+
     uv sync
-    cp .env.example .env   # fill in values
+    cp .env.example .env             # fill in values, see below
+    docker compose up -d db          # Postgres with pgvector
+    uv run outage-matcher ingest     # collect, chunk, embed, index (minutes; downloads two local models)
+    uv run outage-matcher ask "checkout latency spiked after a config push to our load balancers"
+    docker compose up --build        # the API: http://localhost:8000/health and POST /ask
+
+Values in `.env` (placeholders in `.env.example`, never commit `.env`):
+
+- `ANTHROPIC_API_KEY`: the agent (`ask`, `serve`, the faithfulness eval). Without a real key `serve` still starts and `POST /ask` answers 503.
+- `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`: building the gold set and the faithfulness judge only.
+- `POSTGRES_*`, `DATABASE_URL`, `API_PORT`: the database and the published API port. For `uv run` use `DATABASE_URL` with host `localhost`; compose rewrites it to the `db` host inside the network.
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`: optional tracing, see `docs/tracing.md`.
+- `AGENT_MODEL`, `AGENT_MAX_RETRIES`, `AGENT_REQUEST_TIMEOUT`, `AGENT_API_MAX_RETRIES`: optional agent overrides.
+
+## Architecture
+
+    public postmortems (URLs in data/manifest.jsonl)
+            |  outage-matcher ingest  (collect -> chunk by section -> embed with bge + minilm)
+            v
+    Postgres + pgvector  <----------------------------------------------+
+    (postmortems, chunks, HNSW cosine index per model)                   |
+            ^                                                            |
+            |  search_incidents / get_postmortem / filter_by_system_type |
+            |                                                            |
+    LangGraph agent  (src/outage_matcher/agent)                          |
+      retrieve --> grade --relevant--> answer --> likely cause, fix, citations
+         ^           |                                                   |
+         +-- rewrite +--none relevant, retries left                      |
+            ^                                                            |
+            |  OutageAgent.ask(question)                                 |
+    FastAPI  (src/outage_matcher/api)        CLI ask / serve             |
+      GET /health, POST /ask  <---- Docker image, compose `api` service  |
+            |                                                            |
+            +--> Langfuse (optional): a trace per question, spans per node and tool call
+
+    Evals (src/outage_matcher/evals, evals/): gold set -> retrieval recall@k and MRR, faithfulness
+    judge, summary and baseline -> CI gate (.github/workflows/eval.yml) fails on a regression.
+
+## Commands
+
+    uv run pytest -q                                   # tests (offline; -m db for Postgres tests)
+    uv run ruff check . && uv run ruff format --check .
+    uv run outage-matcher ingest [--skip-collect]      # build the index
+    uv run outage-matcher fetch-raw                    # download the manifest's pages into data/raw
+    uv run outage-matcher search "<query>" [--model bge|minilm] [--k 5]
+    uv run outage-matcher ask "<incident>" [--transcript PATH]
+    uv run outage-matcher serve [--host H] [--port P]  # the API without Docker
+    docker compose up --build                          # db and API
+    uv run python -m outage_matcher.evals.gate index   # CI gate checks, see docs/ci-eval-gate.md
+    uv run python -m outage_matcher.evals.gate compare RESULT.json
+
+The eval commands are listed under Evals (M3).
+
+## API (M4)
+
+    curl -s localhost:8000/health
+    curl -s -X POST localhost:8000/ask -H 'content-type: application/json' \
+      -d '{"question": "checkout latency spiked after a config push to our load balancers"}'
+
+`POST /ask` runs the LangGraph agent and returns `answer`, `likely_cause`, `suggested_fix` and
+`citations` (doc id, title, URL, section). Each request opens its own database connection. Errors are
+JSON `{"error": {"status", "message"}}` without stack traces: 422 for a bad body, 503 when there is
+no API key or the search backend is down, 502 when the model API call fails. A real request through
+the container is recorded in `docs/compose-ask-example.md`.
+
+## Tracing (M4)
+
+With `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` set, each question becomes a Langfuse trace
+with a span per graph node and per tool call. Without them tracing is a no-op. Details, and what
+has and has not been verified, are in `docs/tracing.md`.
+
+## CI eval gate (M4)
+
+`.github/workflows/eval.yml` builds the index in CI from the committed manifest (caching `data/raw`
+keyed on the manifest hash, then `fetch-raw --strict` on every run to fetch whatever is missing),
+runs the retrieval eval and compares it with `evals/baseline.json`. The rule:
+
+- The job fails, with a message to refresh the baseline, only if the fresh index is structurally
+  incompatible with the gold set: a gold held-out chunk id or relevant document id is missing, a gold
+  chunk id now points at another document, URL or position than the gold row says (chunk ids are
+  serial numbers and shift when a page changes its chunk count), or the document or chunk count is
+  more than 2 percent from the baseline's.
+- Otherwise it fails when recall@k or MRR is more than the tolerance (0.05, absolute) below the
+  baseline.
+- A different index version alone (for example a forum page's view counter changed) only prints a
+  `WARNING` with the old and new version; the job still passes if the metrics are within tolerance.
+
+The LLM-judged faithfulness job runs only on manual dispatch (never on pull requests: the
+repository is public and the job spends credits and uses the API-key secrets). The workflow has not
+been run on GitHub; the comparison logic is `outage_matcher.evals.gate`, covered by
+unit tests. See `docs/ci-eval-gate.md`.
 
 ## Why pgvector over Chroma
 

@@ -545,3 +545,44 @@ def collect(
             "".join(json.dumps(f, ensure_ascii=False) + "\n" for f in failures), encoding="utf-8"
         )
     return list(entries.values()), failures
+
+
+@dataclass(frozen=True)
+class FetchReport:
+    present: int  # pages already in raw_dir
+    fetched: int
+    failures: list[dict[str, str]]
+
+
+def fetch_missing_pages(
+    entries: Iterable[ManifestEntry],
+    *,
+    raw_dir: Path = RAW_DIR,
+    fetcher: Fetcher | None = None,
+    today: date | None = None,
+    log: Callable[[str], None] = lambda _msg: None,
+) -> FetchReport:
+    """Fetch the manifest's pages that are not in `raw_dir`; the manifest itself is not changed.
+
+    This rebuilds `data/raw` from a clean checkout (CI) without discovering new candidates, so the
+    corpus is exactly what the committed manifest lists. Pages go through the same checks as
+    `collect` (robots, size, text length); one that fails is reported, not fatal.
+    """
+    fetcher = fetcher or Fetcher()
+    today = today or date.today()
+    present = fetched = 0
+    failures: list[dict[str, str]] = []
+    for entry in entries:
+        if (raw_dir / f"{entry.doc_id}.html").exists():
+            present += 1
+            continue
+        stored, reason = fetch_one(
+            fetcher, Candidate(entry.url, entry.source, entry.title), raw_dir, today
+        )
+        if stored is None:
+            failures.append({"url": entry.url, "source": entry.source, "reason": reason})
+            log(f"could not fetch {entry.url}: {reason}")
+            continue
+        fetched += 1
+        log(f"fetched {fetched}: {entry.title[:60]}")
+    return FetchReport(present, fetched, failures)

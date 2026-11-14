@@ -1,0 +1,180 @@
+# Retrieval regression gate and the optional LLM-judged faithfulness run.
+#
+# [ESCALATE] This workflow handles secrets (ANTHROPIC_API_KEY, DEEPSEEK_API_KEY); the owner reads it
+# before merge. Secrets are read only from GitHub secrets, only in the steps of the faithfulness job
+# that need them, and are never printed. That job runs on workflow_dispatch only: the repository is
+# public, it spends credits, and code from a pull request branch would run with the keys in its
+# environment. The retrieval job uses no secrets, so it also runs on pull requests from forks.
+#
+# This file has not been run on GitHub. The same checks run locally:
+#   uv run python -m outage_matcher.evals.gate index
+#   uv run python -m outage_matcher.evals.gate compare RESULT.json
+name: eval
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Faithfulness run: only the first N gold queries (empty: all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  retrieval:
+    name: retrieval gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          # A throwaway database that only this job can reach: no password is stored anywhere.
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: outage
+          POSTGRES_DB: outage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U outage -d outage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://outage@localhost:5432/outage
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # data/raw is git-ignored, so a fresh clone has none. It is cached by the manifest's hash. The
+      # fetch step runs every time: it downloads only the pages missing from data/raw (nothing on a
+      # complete cache, everything on a miss), and --strict fails the job if any manifest page is
+      # still missing, so an incomplete cache is completed or fails loudly. The cache is saved only
+      # when the whole job passes.
+      - name: Restore raw pages
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-${{ hashFiles('data/manifest.jsonl') }}
+      - name: Fetch the manifest's missing pages
+        run: uv run outage-matcher fetch-raw --strict
+      - name: Restore embedding models
+        uses: actions/cache@v4
+        with:
+          path: .cache/fastembed
+          key: fastembed-bge-minilm-v1
+
+      - name: Ingest from the manifest
+        run: uv run outage-matcher ingest --skip-collect
+      # Fails, with the instructions to refresh the baseline, only if the index is structurally
+      # incompatible with the gold set (a gold chunk or document id is missing, or the document or
+      # chunk count is more than 2 percent off the baseline's). A different index version alone
+      # (for example a forum view counter) only prints a WARNING.
+      - name: Check the index fits the gold set
+        run: uv run python -m outage_matcher.evals.gate index --summary-file "$GITHUB_STEP_SUMMARY"
+      # --allow-index-mismatch: the gold set records the baseline's index version, and a changed
+      # version alone is tolerated; the previous step already checked the gold ids and counts.
+      - name: Retrieval eval (bge, section chunking)
+        run: >-
+          uv run python -m outage_matcher.evals.run_retrieval --model bge --chunking section
+          --name ci-bge-section --results-dir "$RUNNER_TEMP/eval-results"
+          --allow-index-mismatch
+      - name: Compare with evals/baseline.json
+        run: >-
+          uv run python -m outage_matcher.evals.gate compare
+          "$RUNNER_TEMP/eval-results/ci-bge-section.json" --summary-file "$GITHUB_STEP_SUMMARY"
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval-result
+          path: ${{ runner.temp }}/eval-results/
+          if-no-files-found: ignore
+
+  faithfulness:
+    name: faithfulness (LLM judge)
+    needs: retrieval
+    # Started by hand only. Never on pull requests: the repository is public, the job spends API
+    # credits, and a pull request branch can change the code that runs with the keys.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: outage
+          POSTGRES_DB: outage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U outage -d outage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://outage@localhost:5432/outage
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/.cache/fastembed
+    steps:
+      # Fail fast, before the slow ingest, if a secret is not configured. Only tests that the
+      # values are non-empty; they are never printed.
+      - name: Require both API keys
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY and DEEPSEEK_API_KEY must both be set as repository secrets"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Restore raw pages
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: raw-${{ hashFiles('data/manifest.jsonl') }}
+      - name: Fetch the manifest's missing pages
+        run: uv run outage-matcher fetch-raw --strict
+      - name: Restore embedding models
+        uses: actions/cache@v4
+        with:
+          path: .cache/fastembed
+          key: fastembed-bge-minilm-v1
+      - name: Ingest from the manifest
+        run: uv run outage-matcher ingest --skip-collect
+      - name: Check the index fits the gold set
+        run: uv run python -m outage_matcher.evals.gate index --summary-file "$GITHUB_STEP_SUMMARY"
+      - name: Faithfulness eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          LIMIT: ${{ inputs.limit }}
+        run: >-
+          uv run python -m outage_matcher.evals.run_faithfulness
+          --out "$RUNNER_TEMP/eval-results/faithfulness.json" --allow-index-mismatch
+          ${LIMIT:+--limit "$LIMIT"}
+      - name: Upload the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: faithfulness-result
+          path: ${{ runner.temp }}/eval-results/
+          if-no-files-found: ignore

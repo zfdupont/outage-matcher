@@ -294,3 +294,53 @@ def test_ask_builds_the_client_from_config(ask_env, monkeypatch):
     monkeypatch.setenv("AGENT_REQUEST_TIMEOUT", "30")
     assert cli.main(["ask", "q"]) == 0
     assert seen["args"] == ("sk-test-not-real", 30.0, 2)
+
+
+# ----- fetch-raw -----------------------------------------------------------------------------
+
+
+def make_entry(url: str = "https://x.test/pm") -> ManifestEntry:
+    return ManifestEntry("d1", url, "Title", "community", "2026-11-13", "database")
+
+
+def test_fetch_raw_reports_counts_and_leaves_the_manifest_alone(monkeypatch, capsys):
+    from outage_matcher.ingest.collect import FetchReport
+
+    monkeypatch.setattr(cli.collect_mod, "read_manifest", lambda: [make_entry()])
+    monkeypatch.setattr(
+        cli.collect_mod, "fetch_missing_pages", lambda entries, log=None: FetchReport(0, 1, [])
+    )
+
+    def no_write(*a, **kw):
+        raise AssertionError("fetch-raw must not rewrite the manifest")
+
+    monkeypatch.setattr(cli.collect_mod, "write_manifest", no_write)
+    assert cli.main(["fetch-raw"]) == 0
+    assert "1 pages: 0 already in data/raw, 1 fetched, 0 not fetched" in capsys.readouterr().out
+
+
+def test_fetch_raw_failures_warn_and_only_fail_when_strict(monkeypatch, capsys):
+    from outage_matcher.ingest.collect import FetchReport
+
+    failed = FetchReport(0, 0, [{"url": "https://x.test/pm", "source": "community", "reason": "x"}])
+    monkeypatch.setattr(cli.collect_mod, "read_manifest", lambda: [make_entry()])
+    monkeypatch.setattr(cli.collect_mod, "fetch_missing_pages", lambda entries, log=None: failed)
+    assert cli.main(["fetch-raw"]) == 0
+    assert "will differ from the one the baseline" in capsys.readouterr().err
+    assert cli.main(["fetch-raw", "--strict"]) == 1
+
+
+def test_fetch_raw_without_a_manifest_fails(monkeypatch, capsys):
+    monkeypatch.setattr(cli.collect_mod, "read_manifest", lambda: [])
+    assert cli.main(["fetch-raw"]) == 1
+    assert "no manifest" in capsys.readouterr().err
+
+
+def test_fetch_raw_strict_passes_when_every_page_is_there(monkeypatch):
+    from outage_matcher.ingest.collect import FetchReport
+
+    monkeypatch.setattr(cli.collect_mod, "read_manifest", lambda: [make_entry()])
+    monkeypatch.setattr(
+        cli.collect_mod, "fetch_missing_pages", lambda entries, log=None: FetchReport(1, 0, [])
+    )
+    assert cli.main(["fetch-raw", "--strict"]) == 0

@@ -300,3 +300,44 @@ def test_progress_is_saved_when_a_run_is_interrupted(tmp_path, monkeypatch):
     stored = collect.read_manifest(data / "manifest.jsonl")
     assert [e.url for e in stored] == [calls[0]]
     assert (data / "collect_failures.jsonl").exists()
+
+
+def manifest_entry(url: str, doc_id: str | None = None) -> collect.ManifestEntry:
+    return collect.ManifestEntry(
+        doc_id or collect.doc_id_for(url), url, "Title", "community", "2026-11-13", "database"
+    )
+
+
+def test_fetch_missing_pages_fetches_only_what_is_absent(tmp_path):
+    have, need, gone = "https://a.test/have", "https://a.test/need", "https://a.test/gone"
+    entries = [manifest_entry(u) for u in (have, need, gone)]
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    (raw / f"{entries[0].doc_id}.html").write_text("cached")
+    calls: list[str] = []
+    fetcher = make_fetcher({need: page("Needed outage")}, calls)
+
+    report = collect.fetch_missing_pages(
+        entries, raw_dir=raw, fetcher=fetcher, today=date(2026, 11, 14)
+    )
+
+    assert (report.present, report.fetched) == (1, 1)
+    assert [f["url"] for f in report.failures] == [gone]
+    assert "http 404" in report.failures[0]["reason"]
+    assert (raw / f"{entries[0].doc_id}.html").read_text() == "cached"  # never refetched
+    assert "Needed outage" in (raw / f"{entries[1].doc_id}.html").read_text()
+    assert have not in " ".join(calls)
+
+
+def test_fetch_missing_pages_with_everything_present_makes_no_requests(tmp_path):
+    url = "https://a.test/have"
+    entry = manifest_entry(url)
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    (raw / f"{entry.doc_id}.html").write_text("cached")
+    calls: list[str] = []
+    report = collect.fetch_missing_pages(
+        [entry], raw_dir=raw, fetcher=make_fetcher({}, calls), today=date(2026, 11, 14)
+    )
+    assert (report.present, report.fetched, report.failures) == (1, 0, [])
+    assert calls == []

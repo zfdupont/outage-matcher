@@ -33,6 +33,17 @@ def test_tracer_is_none_with_only_one_key(no_keys, monkeypatch, missing):
     assert get_tracer() is None
 
 
+@pytest.mark.parametrize("value", ["your-key-here", " ", ""])
+def test_placeholder_or_blank_keys_do_not_enable_tracing(no_keys, monkeypatch, value):
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", value)
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-real")
+    assert tracing_enabled() is False
+    assert get_tracer() is None
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-real")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", value)
+    assert tracing_enabled() is False
+
+
 def test_tracer_is_langfuse_handler_with_keys(keys):
     from langfuse.langchain import CallbackHandler
 

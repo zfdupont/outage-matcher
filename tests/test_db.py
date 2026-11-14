@@ -24,6 +24,20 @@ def test_database_url_missing_raises(monkeypatch):
         db.database_url()
 
 
+def test_connect_sets_a_connect_timeout(monkeypatch):
+    seen = {}
+
+    def fake_connect(url, **kwargs):
+        seen.update(url=url, **kwargs)
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(db.psycopg, "connect", fake_connect)
+    with pytest.raises(RuntimeError, match="stop here"):
+        db.connect("postgresql://u:p@h:1/d")
+    assert seen == {"url": "postgresql://u:p@h:1/d", "connect_timeout": db.CONNECT_TIMEOUT}
+    assert 0 < db.CONNECT_TIMEOUT <= 30
+
+
 @pytest.mark.db
 def test_create_schema_roundtrip():
     with db.connect() as conn:

@@ -25,6 +25,7 @@ from outage_matcher.agent.tools import (
     run_tool,
 )
 from outage_matcher.config import AgentConfig
+from outage_matcher.observability import get_tracer, trace_span
 
 MAX_TOOL_TURNS = 4  # model calls inside one retrieve node
 GRADE_CHARS = 700  # chunk text shown to the grader
@@ -201,8 +202,18 @@ class OutageAgent:
                 return (block.input if isinstance(block.input, dict) else None), usage
         return None, usage
 
+    def _run_tool(self, name: str, tool_input: Any) -> Any:
+        """One tool call inside its own span (a no-op wrapper when tracing is off)."""
+
+        @trace_span(f"tool.{name}")
+        def traced(tool_input: Any) -> Any:
+            return run_tool(self.ctx, name, tool_input)
+
+        return traced(tool_input)
+
     # ----- nodes --------------------------------------------------------------------------
 
+    @trace_span("node.retrieve")
     def retrieve(self, state: AgentState) -> dict[str, Any]:
         prompt = f"Incident: {state['question']}\n\nSearch focus: {state['query']}"
         if state["past_queries"]:
@@ -227,7 +238,7 @@ class OutageAgent:
             messages.append({"role": "assistant", "content": _echo_blocks(response.content)})
             results = []
             for call in calls:
-                result = run_tool(self.ctx, call.name, call.input)
+                result = self._run_tool(call.name, call.input)
                 found = _merge(found, result.retrieved)
                 error = result.content.get("error") or {}
                 if error.get("type") == BACKEND_ERROR:
@@ -263,6 +274,7 @@ class OutageAgent:
             "events": events,
         }
 
+    @trace_span("node.grade")
     def grade(self, state: AgentState) -> dict[str, Any]:
         pending = state["pending"]
         events = list(state["events"])
@@ -302,6 +314,7 @@ class OutageAgent:
             return "answer"
         return "rewrite"
 
+    @trace_span("node.rewrite")
     def rewrite(self, state: AgentState) -> dict[str, Any]:
         titles = "; ".join(sorted({c.title for c in state["retrieved"]})[:8]) or "none"
         prompt = (
@@ -322,6 +335,7 @@ class OutageAgent:
             "events": events,
         }
 
+    @trace_span("node.answer")
     def answer(self, state: AgentState) -> dict[str, Any]:
         relevant = state["relevant"][:MAX_ANSWER_CHUNKS]
         if not relevant:
@@ -396,7 +410,11 @@ class OutageAgent:
         }
         # Each pass is retrieve, grade, rewrite; the hard cap is max_retries, this only guards bugs.
         limit = 8 + 3 * (self.config.max_retries + 1)
-        final = self.graph.invoke(state, {"recursion_limit": limit})
+        run_config: dict[str, Any] = {"recursion_limit": limit}
+        tracer = get_tracer()  # None unless the Langfuse keys are set
+        if tracer is not None:
+            run_config["callbacks"] = [tracer]
+        final = self.graph.invoke(state, run_config)
         answer = final["answer"]
         assert answer is not None
         # Evidence for the evals: the excerpts the answerer saw first, then everything else.
