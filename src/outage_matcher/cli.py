@@ -74,14 +74,21 @@ def _api_key() -> str | None:
     return None if not key or key.startswith("your-") else key
 
 
-def _build_agent(conn, api_key: str, config):
-    # Imported here so `ingest` and `search` do not pay for loading langgraph and anthropic.
+def _make_client(api_key: str, config):
+    """Anthropic client with an explicit timeout and retry count (the SDK default is 10 minutes)."""
     import anthropic
 
+    return anthropic.Anthropic(
+        api_key=api_key, timeout=config.request_timeout, max_retries=config.api_max_retries
+    )
+
+
+def _build_agent(conn, client, config):
+    # Imported here so `ingest` and `search` do not pay for loading langgraph.
     from outage_matcher.agent.graph import OutageAgent
     from outage_matcher.agent.tools import ToolContext
 
-    return OutageAgent(anthropic.Anthropic(api_key=api_key), ToolContext(conn), config)
+    return OutageAgent(client, ToolContext(conn), config)
 
 
 def cmd_ask(args: argparse.Namespace) -> int:
@@ -99,7 +106,7 @@ def cmd_ask(args: argparse.Namespace) -> int:
     config = load_config()
     try:
         with db.connect() as conn:
-            result = _build_agent(conn, api_key, config).ask(args.question)
+            result = _build_agent(conn, _make_client(api_key, config), config).ask(args.question)
     except anthropic.APIError as exc:  # network, auth, rate limit or bad model name
         _log(f"error: Anthropic API call failed: {exc}")
         return 1
@@ -115,7 +122,6 @@ def cmd_ask(args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
-    from dotenv import load_dotenv
 
     from outage_matcher.api.app import create_app
 

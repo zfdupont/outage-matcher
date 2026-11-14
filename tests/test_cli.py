@@ -270,3 +270,27 @@ def test_ask_search_failure_is_a_one_line_error_not_a_no_match(ask_env, monkeypa
     captured = capsys.readouterr()
     assert captured.err.startswith("error: search failed: database is down")
     assert "No close match" not in captured.out and "Traceback" not in captured.err
+
+
+def test_client_is_built_with_explicit_timeout_and_retries():
+    from outage_matcher.config import AgentConfig
+
+    client = cli._make_client(
+        "sk-test-not-real", AgentConfig(request_timeout=12.0, api_max_retries=1)
+    )
+    assert client.timeout == 12.0
+    assert client.max_retries == 1
+
+
+def test_ask_builds_the_client_from_config(ask_env, monkeypatch):
+    seen = {}
+
+    def fake_make_client(key, config):
+        seen["args"] = (key, config.request_timeout, config.api_max_retries)
+        return "client"
+
+    monkeypatch.setattr(cli, "_make_client", fake_make_client)
+    monkeypatch.setattr(cli, "_build_agent", lambda conn, client, config: FakeAgent(agent_result()))
+    monkeypatch.setenv("AGENT_REQUEST_TIMEOUT", "30")
+    assert cli.main(["ask", "q"]) == 0
+    assert seen["args"] == ("sk-test-not-real", 30.0, 2)
