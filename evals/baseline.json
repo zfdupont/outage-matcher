@@ -12,6 +12,8 @@
   "gold_sha256": "23e49b91b78f1362ee1b1242ba8ecd186cc54ae4ebb4f8c9afe4ed95a1d8c1ea",
   "gold_queries": 34,
   "index_version": "34c67d0bba77",
+  "index_documents": 235,
+  "index_chunks": 4482,
   "recorded": "2026-11-13",
   "metrics": {
     "recall@1": 0.4117647058823529,
@@ -21,5 +23,5 @@
     "mrr": 0.5194132723794472
   },
   "tolerance": 0.05,
-  "rule": "fail when any metric is below its baseline value minus the tolerance (absolute, on the same gold set)"
+  "rule": "fail when any metric is below its baseline value minus the tolerance (absolute, on the same gold set); see evals/gate.py for the index checks"
 }

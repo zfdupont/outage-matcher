@@ -301,11 +301,13 @@ def baseline_document(run: Run, tolerance: float) -> dict[str, Any]:
         "gold_sha256": run.data["gold"]["sha256"],
         "gold_queries": run.data["gold"]["queries"],
         "index_version": run.data["index"]["version"],
+        "index_documents": run.data["index"]["documents"],
+        "index_chunks": run.data["index"]["chunks"],
         "recorded": run.data["date"],
         "metrics": {key: run.metrics[key] for key in METRIC_KEYS},
         "tolerance": tolerance,
         "rule": "fail when any metric is below its baseline value minus the tolerance "
-        "(absolute, on the same gold set)",
+        "(absolute, on the same gold set); see evals/gate.py for the index checks",
     }
 
 
