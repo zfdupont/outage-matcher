@@ -1,0 +1,99 @@
+{"url": "https://github.blog/news-insights/company-news/github-availability-report-december-2021/", "source": "github", "reason": "too little text (1278 chars)"}
+{"url": "https://blog.cloudflare.com/18-november-2025-outage-uk-ua/", "source": "cloudflare", "reason": "page meta robots forbids indexing"}
+{"url": "https://aws.amazon.com/message/74876-2/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://docs.google.com/document/d/1ScqXAdb6BjhsDzCo3qdPYbt1uULzgZqPO8zHeHHarS0/preview?sle=true&hl=en&forcehl=1", "source": "community", "reason": "too little text (95 chars)"}
+{"url": "https://web.archive.org/web/20211124170124/https://medium.com/making-instapaper/instapaper-outage-cause-recovery-3c32a7e9cc5f", "source": "community", "reason": "denied: Medium terms restrict automated access"}
+{"url": "https://gist.github.com/jomo/2bae3821acb433d0446d", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://aws.amazon.com/message/2329B7/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://status.discordapp.com/incidents/qk9cdgnqnhcn", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://blog.sentry.io/2015/07/23/transaction-id-wraparound-in-postgres", "source": "community", "reason": "http 404"}
+{"url": "https://users.csc.calpoly.edu/~jdalbey/SWE/Papers/att_collapse.html", "source": "community", "reason": "robots.txt fetch failed: ConnectError"}
+{"url": "https://blog.rust-lang.org/inside-rust/2023/07/21/crates-io-postmortem.html", "source": "community", "reason": "too little text (28 chars)"}
+{"url": "https://meta.stackoverflow.com/q/340960/2422776", "source": "community", "reason": "http 403"}
+{"url": "https://aws.amazon.com/message/56489/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://blog.sentry.io/2016/06/14/security-incident-june-12-2016", "source": "community", "reason": "http 404"}
+{"url": "https://githubengineering.com/ddos-incident-report/", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://aws.amazon.com/message/680342/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://status.launchdarkly.com/incidents/yltrp45vtxm2", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://github.com/dastergon/postmortem-templates", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://en.wikipedia.org/wiki/Cluster_%28spacecraft%29?oldid=217305667", "source": "community", "reason": "denied: encyclopedia article, not a primary postmortem"}
+{"url": "https://stuff.mit.edu/afs/athena/course/2/2.75/resources/random/How%20Complex%20Systems%20Fail.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://status.heroku.com/incidents/1091", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://status.pagerduty.com/incidents/vbp7ht2647l8", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://engineering.strava.com/the-upload-outage-of-july-29-2014/", "source": "community", "reason": "http 404"}
+{"url": "https://github.com/macintux/Service-postmortems", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://blog.npmjs.org/post/74949623024/2014-01-28-outage-postmortem.html", "source": "community", "reason": "too little text (1346 chars)"}
+{"url": "https://www.datadoghq.com/blog/2020-09-25-infrastructure-connectivity-issue/", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "http://sunnyday.mit.edu/papers/therac.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://status.duo.com/incidents/4w07bmvnt359", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://web.archive.org/web/20160426163728/https://medium.com/medium-eng/the-curious-case-of-disappearing-polish-s-fa398313d4df", "source": "community", "reason": "denied: Medium terms restrict automated access"}
+{"url": "https://aws.amazon.com/message/65648/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://github.com/blog/2106-january-28th-incident-report", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://pinboard.in/u:peakscale/t:postmortem/", "source": "community", "reason": "disallowed by robots.txt"}
+{"url": "https://web.archive.org/web/20251230063242/https://blog.skyliner.io/post-mortem-outages-on-1-19-17-and-1-23-17-3f65cc6f693e", "source": "community", "reason": "too little text (115 chars)"}
+{"url": "https://regmedia.co.uk/2017/02/23/kcl_external_review.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://llis.nasa.gov/", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://aws.amazon.com/message/17908/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://aws.amazon.com/message/11201/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://status.heroku.com/incidents/2558", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://www.quora.com/Jeff-Hammerbacher/Post-mortems", "source": "community", "reason": "disallowed by robots.txt"}
+{"url": "https://en.wikipedia.org/wiki/Mars_Climate_Orbiter", "source": "community", "reason": "denied: encyclopedia article, not a primary postmortem"}
+{"url": "https://web.archive.org/web/20250903124227/https://www.gps.gov/governance/advisory/meetings/2014-06/beutler1.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://en.wikipedia.org/wiki/Northeast_blackout_of_2003", "source": "community", "reason": "denied: encyclopedia article, not a primary postmortem"}
+{"url": "https://aws.amazon.com/message/12721/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://web.archive.org/web/20220403060108/https://status.aws.amazon.com/s3-20080720.html", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://www.traviscistatus.com/incidents/sxrh0l46czqn", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://help.salesforce.com/apex/HTViewSolution?urlname=Root-Cause-Message-for-Disruption-of-Service-on-NA14-May-2016&language=en_US", "source": "community", "reason": "too little text (46 chars)"}
+{"url": "https://www.google.com/appsstatus/dashboard/incidents/k71P8nHp32hgcMSsC3mR", "source": "community", "reason": "disallowed by robots.txt"}
+{"url": "https://aws.amazon.com/message/5467D2/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://web.archive.org/web/20230727225235/https://www.reddit.com/r/RedditEng/comments/11xx5o0/you_broke_reddit_the_piday_outage/", "source": "community", "reason": "denied: user content with platform terms against scraping"}
+{"url": "https://github.com/snakescott/awesome-tech-postmortems", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://aws.amazon.com/premiumsupport/technology/pes/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://web.archive.org/web/20250505112812/https://medium.com/xandr-tech/2013-09-17-outage-postmortem-586b19ae4307", "source": "community", "reason": "denied: Medium terms restrict automated access"}
+{"url": "https://github.com/icco/postmortems", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://aws.amazon.com/message/67457/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://status.circleci.com/incidents/dcqb3fykhgvg", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://engineering.fb.com/2021/10/05/networking-traffic/outage-details/", "source": "community", "reason": "denied: employer data excluded"}
+{"url": "https://web.archive.org/web/20210421222929/https://status.bintray.com/incidents/w4dfr0rpznkt", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://www3.epa.gov/region1/npdes/merrimackstation/pdfs/ar/AR-1165.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://status.heroku.com/incidents/1042", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://blog.etsy.com/news/2012/demystifying-site-outages/", "source": "community", "reason": "http 403"}
+{"url": "https://aws.amazon.com/message/101925/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://status.pagerduty.com/incidents/70m30bh7qfmx", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://enomstatus.com/incidents/03q064h6rb7x", "source": "community", "reason": "disallowed by robots.txt"}
+{"url": "https://aws.amazon.com/message/073024/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://aws.amazon.com/message/4372T8/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://assets.publishing.service.gov.uk/media/604f423be90e077fdf88493f/Boeing_737-8K5_G-TAWG_04-21.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://blog.rust-lang.org/inside-rust/2023/02/08/dns-outage-portmortem.html", "source": "community", "reason": "too little text (28 chars)"}
+{"url": "https://aws.amazon.com/message/656481/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://web.archive.org/web/20221029203405/https://www.reddit.com/r/announcements/comments/4y0m56/why_reddit_was_down_on_aug_11/", "source": "community", "reason": "denied: user content with platform terms against scraping"}
+{"url": "https://allegro.tech/2018/08/postmortem-why-allegro-went-down.html", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://status.heroku.com/incidents/642?postmortem", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://allegro.tech/2015/01/allegro-cast-post-mortem.html", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://web.archive.org/web/20220124104632/https://cercind.gov.in/2012/orders/Final_Report_Grid_Disturbance.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://blog.thousandeyes.com/facebook-outage-deep-dive/", "source": "community", "reason": "denied: employer data excluded"}
+{"url": "https://github.com/lorin/major-incidents", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://aws.amazon.com/message/061323/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://www.crowdstrike.com/falcon-content-update-remediation-and-guidance-hub/", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://www.traviscistatus.com/incidents/khzk8bg4p9sy", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://aws.amazon.com/message/65649/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://status.circleci.com/incidents/8rklh3qqckp1", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://web.archive.org/web/20210818034431/https://medium.com/square-corner-blog/incident-summary-2017-03-16-2f65be39297", "source": "community", "reason": "denied: Medium terms restrict automated access"}
+{"url": "https://status.discordapp.com/incidents/dj3l6lw926kl", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://status.heroku.com/incidents/2451", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://web.archive.org/web/20220704223244/https://flowdock-resources.s3.amazonaws.com/legal/Flowdock-RCA-For-Incident-On-2020-04-21.pdf", "source": "community", "reason": "denied: not HTML"}
+{"url": "https://web.archive.org/web/20201202234639/https://medium.com/@florian_7764/technical-post-mortem-of-the-august-incident-82ab4c3d6547", "source": "community", "reason": "denied: Medium terms restrict automated access"}
+{"url": "https://status.mailgun.com/incidents/p9nxxql8g9rh", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://status.twilio.com/incidents/wdrlk4qps0z1", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://circleci.statuspage.io/incidents/hr0mm9xmm3x6", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://www.traviscistatus.com/incidents/z2b3lz2kwcfp", "source": "community", "reason": "page meta robots forbids indexing"}
+{"url": "https://tech.trivago.com/2021/10/05/postmortem-removing-all-users-from-github.com/trivago/", "source": "community", "reason": "too little text (0 chars)"}
+{"url": "https://www.elastic.co/blog/elastic-cloud-january-18-2019-incident-report", "source": "community", "reason": "too large"}
+{"url": "https://blog.bitly.com/post/85260908544/more-detail", "source": "community", "reason": "http 404"}
+{"url": "https://blog.github.com/2018-10-30-oct21-post-incident-analysis/", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://help.salesforce.com/s/articleView?id=000396429&type=1", "source": "community", "reason": "too little text (46 chars)"}
+{"url": "https://github.com/valvesoftware/steam-for-linux/issues/3671", "source": "community", "reason": "denied: user repositories with mixed licenses"}
+{"url": "https://aws.amazon.com/message/41926/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://wikitech.wikimedia.org/wiki/Incident_documentation", "source": "community", "reason": "too little text (1296 chars)"}
+{"url": "https://aws.amazon.com/message/680587/", "source": "community", "reason": "denied: AWS Site Terms prohibit data mining, robots and downloading"}
+{"url": "https://support.stripe.com/questions/outage-postmortem-2015-10-08-utc", "source": "community", "reason": "too little text (10 chars)"}
