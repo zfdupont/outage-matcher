@@ -6,10 +6,10 @@ Requires the index to be populated (`outage-matcher ingest`).
 
 import json
 from datetime import date
-from pathlib import Path
 
 from outage_matcher import db
 from outage_matcher.ingest.embed import MODELS
+from outage_matcher.ingest.stats import STATS_PATH
 from outage_matcher.search import search
 
 QUERIES = [
@@ -23,7 +23,7 @@ K = 5
 
 
 def main() -> None:
-    stats = json.loads(Path("data/corpus_stats.json").read_text())
+    stats = json.loads(STATS_PATH.read_text(encoding="utf-8"))
     print("# Embedding comparison, M1 (qualitative)\n")
     print(
         f"Generated {date.today().isoformat()} by `scripts/compare_embeddings_m1.py` over "

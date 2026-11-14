@@ -16,7 +16,8 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 - `docker compose up -d db` - start Postgres with pgvector (config in `.env`, see `.env.example`)
 - `uv run outage-matcher ingest` - collect, chunk, embed and index postmortems (`--skip-collect` reuses `data/raw`)
 - `uv run outage-matcher search "<query>" [--model bge|minilm] [--k 5]` - search the index (both models by default)
-- `uv run pytest -m "db or network" -o addopts=""` - opt-in tests that need Postgres or the network
+- `uv run pytest -m db -o addopts=""` - opt-in tests that need the running Postgres container
+- `uv run python scripts/compare_embeddings_m1.py` - print the M1 two-model comparison tables
 
 ## Architecture
 `src/outage_matcher/`: ingest (collect, chunk, embed, index), search, agent (LangGraph), evals, api. Eval gold set under `evals/`.

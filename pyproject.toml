@@ -39,8 +39,7 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not network and not db'"
+addopts = "-m 'not db'"
 markers = [
-    "network: needs internet access (skipped by default)",
     "db: needs a running Postgres with pgvector (skipped by default)",
 ]
