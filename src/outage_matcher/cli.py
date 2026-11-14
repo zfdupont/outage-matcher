@@ -1,15 +1,19 @@
-"""Command line entry point: `outage-matcher ingest` and `outage-matcher search`."""
+"""Command line entry point: `outage-matcher ingest`, `search` and `ask`."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 import psycopg
+from dotenv import load_dotenv
 
 from outage_matcher import db
+from outage_matcher.config import load_config
 from outage_matcher.ingest import collect as collect_mod
 from outage_matcher.ingest import index as index_mod
 from outage_matcher.ingest import stats as stats_mod
@@ -63,6 +67,52 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def _api_key() -> str | None:
+    """ANTHROPIC_API_KEY from the environment or .env; the .env.example placeholder is unset."""
+    load_dotenv()
+    key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    return None if not key or key.startswith("your-") else key
+
+
+def _build_agent(conn, api_key: str, config):
+    # Imported here so `ingest` and `search` do not pay for loading langgraph and anthropic.
+    import anthropic
+
+    from outage_matcher.agent.graph import OutageAgent
+    from outage_matcher.agent.tools import ToolContext
+
+    return OutageAgent(anthropic.Anthropic(api_key=api_key), ToolContext(conn), config)
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    import anthropic
+
+    from outage_matcher.agent import transcript
+
+    api_key = _api_key()
+    if api_key is None:
+        _log(
+            "ANTHROPIC_API_KEY is not set (or is still the .env.example placeholder); "
+            "set a real key in the environment or .env to run `ask`."
+        )
+        return 1
+    config = load_config()
+    try:
+        with db.connect() as conn:
+            result = _build_agent(conn, api_key, config).ask(args.question)
+    except anthropic.APIError as exc:  # network, auth, rate limit or bad model name
+        _log(f"error: Anthropic API call failed: {exc}")
+        return 1
+    print(transcript.render_answer(result))
+    print(transcript.render_usage(result))
+    if args.transcript:
+        path = Path(args.transcript)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(transcript.render_markdown(result, config.model), encoding="utf-8")
+        _log(f"transcript written to {path}")
+    return 0
+
+
 def positive_int(value: str) -> int:
     number = int(value)
     if number < 1:
@@ -87,6 +137,13 @@ def build_parser() -> argparse.ArgumentParser:
     find.add_argument("--k", type=positive_int, default=5)
     find.add_argument("--system-type", help="restrict to a system type label")
     find.set_defaults(func=cmd_search)
+
+    ask = sub.add_parser(
+        "ask", help="describe an incident, get a likely cause and fix with citations"
+    )
+    ask.add_argument("question", help="incident description")
+    ask.add_argument("--transcript", metavar="PATH", help="also save a Markdown transcript here")
+    ask.set_defaults(func=cmd_ask)
     return parser
 
 

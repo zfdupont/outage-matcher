@@ -150,3 +150,109 @@ def test_missing_database_url_is_a_one_line_error(monkeypatch, capsys):
     monkeypatch.setattr(cli.db, "load_dotenv", lambda: False)
     assert cli.main(["search", "q"]) == 1
     assert "DATABASE_URL is not set" in capsys.readouterr().err
+
+
+# ----- ask ------------------------------------------------------------------------------------
+
+
+class FakeAgent:
+    def __init__(self, result):
+        self.result = result
+        self.questions = []
+
+    def ask(self, question):
+        self.questions.append(question)
+        return self.result
+
+
+def agent_result(no_match=False):
+    from outage_matcher.agent.models import AgentAnswer, AgentResult, Citation, Usage
+
+    if no_match:
+        answer = AgentAnswer("No close match.", "Add detail.", no_match=True)
+    else:
+        cite = Citation(7, "LB outage", "https://x.test/lb", "root_cause")
+        answer = AgentAnswer("Bad config push.", "Roll back.", [cite])
+    events = [
+        {
+            "type": "tool_call",
+            "name": "search_incidents",
+            "input": {"query": "q"},
+            "is_error": False,
+            "doc_ids": [7],
+            "error": None,
+        },
+        {"type": "grade", "graded": 5, "relevant": 2},
+    ]
+    return AgentResult("checkout is slow", answer, Usage(300, 90, 4), 1, events)
+
+
+@pytest.fixture
+def ask_env(monkeypatch):
+    from outage_matcher import config
+
+    monkeypatch.setattr(cli, "load_dotenv", lambda: False)
+    monkeypatch.setattr(config, "load_dotenv", lambda: False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-real")
+    monkeypatch.delenv("AGENT_MODEL", raising=False)
+    monkeypatch.delenv("AGENT_MAX_RETRIES", raising=False)
+    monkeypatch.setattr(cli.db, "connect", fake_connect)
+
+
+def test_ask_prints_answer_citations_and_usage(ask_env, monkeypatch, capsys):
+    agent = FakeAgent(agent_result())
+    monkeypatch.setattr(cli, "_build_agent", lambda conn, key, config: agent)
+    assert cli.main(["ask", "checkout is slow"]) == 0
+    out = capsys.readouterr().out
+    assert agent.questions == ["checkout is slow"]
+    assert "Likely cause: Bad config push." in out
+    assert "Suggested fix: Roll back." in out
+    assert "[7] LB outage (root_cause)" in out and "https://x.test/lb" in out
+    assert "Usage: 4 LLM calls, 300 input tokens, 90 output tokens, 1 query rewrites" in out
+
+
+def test_ask_no_match_says_so(ask_env, monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_build_agent", lambda *a: FakeAgent(agent_result(no_match=True)))
+    assert cli.main(["ask", "q"]) == 0
+    assert "Citations: none" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("key", [None, "", "your-key-here"])
+def test_ask_without_a_real_key_stops_with_a_note(monkeypatch, capsys, key):
+    monkeypatch.setattr(cli, "load_dotenv", lambda: False)
+    if key is None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", key)
+
+    def no_db():
+        raise AssertionError("must not touch the database without a key")
+
+    monkeypatch.setattr(cli.db, "connect", no_db)
+    assert cli.main(["ask", "q"]) == 1
+    err = capsys.readouterr().err
+    assert "ANTHROPIC_API_KEY is not set" in err and "Traceback" not in err
+
+
+def test_ask_writes_transcript(ask_env, monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "_build_agent", lambda *a: FakeAgent(agent_result()))
+    target = tmp_path / "examples" / "run.md"
+    assert cli.main(["ask", "checkout is slow", "--transcript", str(target)]) == 0
+    text = target.read_text()
+    assert "## Question\n\ncheckout is slow" in text
+    assert "- tool `search_incidents`" in text and "- grade: 2 of 5 chunks relevant" in text
+    assert "Model: claude-haiku-5-5" in text and "Usage: 4 LLM calls" in text
+
+
+def test_ask_api_error_is_a_one_line_error(ask_env, monkeypatch, capsys):
+    import anthropic
+    import httpx
+
+    class Boom:
+        def ask(self, question):
+            raise anthropic.APIConnectionError(request=httpx.Request("POST", "https://x.test"))
+
+    monkeypatch.setattr(cli, "_build_agent", lambda *a: Boom())
+    assert cli.main(["ask", "q"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("error: Anthropic API call failed") and "Traceback" not in err

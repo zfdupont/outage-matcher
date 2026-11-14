@@ -16,11 +16,12 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 - `docker compose up -d db` - start Postgres with pgvector (config in `.env`, see `.env.example`)
 - `uv run outage-matcher ingest` - collect, chunk, embed and index postmortems (`--skip-collect` reuses `data/raw`)
 - `uv run outage-matcher search "<query>" [--model bge|minilm] [--k 5]` - search the index (both models by default)
+- `uv run outage-matcher ask "<incident description>" [--transcript PATH]` - run the agent (needs a real `ANTHROPIC_API_KEY`; model via `AGENT_MODEL`, retry cap via `AGENT_MAX_RETRIES`)
 - `uv run pytest -m db -o addopts=""` - opt-in tests that need the running Postgres container
 - `uv run python scripts/compare_embeddings_m1.py` - print the M1 two-model comparison tables
 
 ## Architecture
-`src/outage_matcher/`: ingest (collect, chunk, embed, index), search, agent (LangGraph), evals, api. Eval gold set under `evals/`.
+`src/outage_matcher/`: ingest (collect, chunk, embed, index), search, config, agent (`tools.py`, `graph.py` LangGraph retrieve/grade/rewrite/answer, `transcript.py`), evals, api. Eval gold set under `evals/`.
 
 ## Environment Variables
 ANTHROPIC_API_KEY, VOYAGE_API_KEY, OPENAI_API_KEY, DATABASE_URL, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
