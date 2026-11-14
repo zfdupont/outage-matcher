@@ -31,7 +31,7 @@ EARLIER_FAITHFULNESS_FILES = (
 )
 SUMMARY_PATH = RESULTS_DIR / "summary.md"
 BASELINE_PATH = Path("evals/baseline.json")
-DEFAULT_TOLERANCE = 0.05  # about one gold query of recall@k (1 query = 1/34)
+DEFAULT_TOLERANCE = 0.05  # 1.7 gold queries of recall@k (1 query = 1/34): one flip passes
 METRIC_KEYS = [f"recall@{k}" for k in KS] + ["mrr"]
 
 
@@ -307,7 +307,8 @@ def baseline_document(run: Run, tolerance: float) -> dict[str, Any]:
         "metrics": {key: run.metrics[key] for key in METRIC_KEYS},
         "tolerance": tolerance,
         "rule": "fail when any metric is below its baseline value minus the tolerance "
-        "(absolute, on the same gold set); see evals/gate.py for the index checks",
+        "(absolute, on the same gold set); "
+        "see src/outage_matcher/evals/gate.py for the index checks",
     }
 
 

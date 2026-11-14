@@ -23,5 +23,5 @@
     "mrr": 0.5194132723794472
   },
   "tolerance": 0.05,
-  "rule": "fail when any metric is below its baseline value minus the tolerance (absolute, on the same gold set); see evals/gate.py for the index checks"
+  "rule": "fail when any metric is below its baseline value minus the tolerance (absolute, on the same gold set); see src/outage_matcher/evals/gate.py for the index checks"
 }

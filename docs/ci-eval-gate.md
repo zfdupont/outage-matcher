@@ -38,8 +38,9 @@ change on a source page should not block a pull request.
    - the document count or the chunk count differs from the baseline's
      (`index_documents`, `index_chunks` in `evals/baseline.json`) by more than 2 percent.
 2. **Otherwise** recall@1, 3, 5, 10 and MRR are compared with the baseline: the gate fails when any
-   is below its baseline value minus the tolerance in `evals/baseline.json` (0.05 absolute, about
-   one gold query; a score exactly at the floor passes). It also fails if the gold set file or the
+   is below its baseline value minus the tolerance in `evals/baseline.json` (0.05 absolute; a score
+   exactly at the floor passes). With the 34 gold queries one query moves a recall@k by 0.029, so 0.05
+   is about 1.7 queries: one flipped query passes, two fail (0.059). It also fails if the gold set file or the
    run configuration (embedding model, chunking, reranker) differs from the baseline's, since those
    scores are not comparable.
 3. **Index version differs alone**: the index version is a hash of every document, chunk id and
@@ -50,6 +51,13 @@ change on a source page should not block a pull request.
 The job fails in the cases of rule 1 and rule 2 and passes with a warning in rule 3. The report is
 printed and appended to the job summary. The warning is a prompt to refresh the baseline when
 convenient, not a failure.
+
+### Why the tolerance is 0.05
+
+One flipped query (0.029) is within what a small change of a source page can cause, while two
+flipped queries on the same metric (0.059) are a real change worth a failed check. The value was
+set in M3 (`DEFAULT_TOLERANCE` in `src/outage_matcher/evals/summary.py`, stored in
+`evals/baseline.json`) before any CI run existed, not tuned to a CI result.
 
 ### Refreshing the baseline
 
