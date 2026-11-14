@@ -1,1 +1,70 @@
-{"jobs": []}
+{
+ "jobs": [
+  {
+   "id": "001-m1-ingest-index",
+   "title": "M1 ingest and index",
+   "branch": "factory/001-m1-ingest-index",
+   "worktree": "/Users/zfdupont/outage-matcher-factory/001-m1-ingest-index",
+   "builder": "",
+   "lane": "milestone",
+   "stage": "merged",
+   "round": 2,
+   "rework": 1,
+   "reviews": {
+    "rules": "PASS",
+    "logic": "PASS",
+    "maintainability": "PASS",
+    "eval-rigor": "skipped",
+    "api-contract": "skipped"
+   },
+   "history": [
+    {
+     "round": 1,
+     "reviews": {
+      "rules": "CHANGES",
+      "logic": "CHANGES",
+      "maintainability": "CHANGES"
+     }
+    }
+   ],
+   "note": "",
+   "updated": "2026-11-14T04:25:31.287838+00:00"
+  },
+  {
+   "id": "002-m2-agent",
+   "title": "M2 agent",
+   "branch": "factory/002-m2-agent",
+   "worktree": "/Users/zfdupont/outage-matcher-factory/002-m2-agent",
+   "builder": "",
+   "lane": "milestone",
+   "stage": "build",
+   "round": 1,
+   "rework": 0,
+   "reviews": {},
+   "history": [],
+   "note": "",
+   "updated": "2026-11-14T04:25:31.391898+00:00"
+  },
+  {
+   "id": "003-m2b-ops-skeleton",
+   "title": "M2b ops skeleton",
+   "branch": "factory/003-m2b-ops-skeleton",
+   "worktree": "/Users/zfdupont/outage-matcher-factory/003-m2b-ops-skeleton",
+   "builder": "",
+   "lane": "milestone",
+   "stage": "merged",
+   "round": 1,
+   "rework": 0,
+   "reviews": {
+    "rules": "PASS",
+    "logic": "PASS",
+    "maintainability": "PASS",
+    "api-contract": "PASS",
+    "eval-rigor": "skipped"
+   },
+   "history": [],
+   "note": "",
+   "updated": "2026-11-14T04:33:36.662638+00:00"
+  }
+ ]
+}
