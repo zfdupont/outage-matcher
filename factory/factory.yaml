@@ -32,7 +32,6 @@ reviewers:
     why: the FastAPI endpoint, Docker image (non-root, healthcheck) and CI regression gate are external interfaces
 qa: null
 escalate:
-  - {when: adds a dependency or changes the build toolchain, paths: [pyproject.toml, requirements.txt, requirements-dev.txt, uv.lock, Dockerfile]}
   - {when: touches CI workflows, paths: [.github/**]}
   - writes or logs any API key, token or .env value
   - adds a data source without a recorded terms check
