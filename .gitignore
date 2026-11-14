@@ -39,3 +39,6 @@ data/chroma/
 
 # Eval caches (embedding matrices, regenerated)
 evals/cache/
+
+# Verification scratch and evidence
+.verify/
