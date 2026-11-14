@@ -130,13 +130,19 @@
    "worktree": "/Users/zfdupont/outage-matcher-factory/006-readme-charts",
    "builder": "",
    "lane": "full",
-   "stage": "build",
+   "stage": "merged",
    "round": 1,
    "rework": 0,
-   "reviews": {},
+   "reviews": {
+    "rules": "PASS",
+    "logic": "PASS",
+    "maintainability": "PASS",
+    "eval-rigor": "PASS",
+    "api-contract": "skipped"
+   },
    "history": [],
    "note": "",
-   "updated": "2026-11-14T07:05:05.069239+00:00"
+   "updated": "2026-11-14T07:10:58.845730+00:00"
   }
  ]
 }

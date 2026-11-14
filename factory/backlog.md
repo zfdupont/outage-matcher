@@ -24,3 +24,6 @@
 - [ ] Watch the first GitHub Actions run of eval.yml and fix what only shows up there (.github/workflows/eval.yml)
 - [ ] Identity-check the confirmed near-duplicate doc ids in gate index, not just existence (src/outage_matcher/evals/gate.py)
 - [ ] Commit the gate output behind the index version cited in docs/ci-eval-gate.md
+
+## Follow-ups from job 006-readme-charts
+- [ ] Report a clear error instead of a KeyError when a result file lacks per_query (src/outage_matcher/evals/charts.py and summary.py)
