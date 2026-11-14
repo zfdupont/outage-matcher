@@ -235,3 +235,8 @@ def test_refreshed_recomputes_title_from_raw(tmp_path):
     (tmp_path / "abc.html").write_text(page("New title"))
     out = collect.refreshed(entry, tmp_path)
     assert (out.title, out.system_type, out.fetched_date) == ("New title", "database", "2026-11-13")
+
+
+def test_title_dashes_are_normalized():
+    html = "<html><head><title>Outage \u2013 post\u2014mortem</title></head><body></body></html>"
+    assert collect.html_title(html) == "Outage - post - mortem"

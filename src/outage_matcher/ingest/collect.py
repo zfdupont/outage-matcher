@@ -232,6 +232,7 @@ def html_title(html: str) -> str:
         title = re.sub(r"\s+", " ", text or "").strip()
         if title:
             break
+    title = re.sub(r"\s*[\u2013\u2014]\s*", " - ", title)  # keep stored titles ASCII-dash only
     if GENERIC_TITLE.match(title):
         # Google Cloud incident pages share one page title; use the incident heading instead.
         headings = [

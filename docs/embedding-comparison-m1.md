@@ -42,7 +42,7 @@ Generated 2026-11-13 by `scripts/compare_embeddings_m1.py` over 235 documents an
 | --- | --- | --- | --- | --- |
 | 1 | GitHub Availability Report: November 2025 | other | 0.516 | https://github.blog/news-insights/company-news/github-availability-report-november-2025/ |
 | 2 | GitHub availability report: July 2026 | other | 0.496 | https://github.blog/news-insights/company-news/github-availability-report-july-2026/ |
-| 3 | Add-Ons Outage Post-Mortem Result – Mozilla Hacks - the Web developer blog | root_cause | 0.468 | https://web.archive.org/web/20250303152906/https://hacks.mozilla.org/2019/07/add-ons-outage-post-mortem-result/ |
+| 3 | Add-Ons Outage Post-Mortem Result - Mozilla Hacks - the Web developer blog | root_cause | 0.468 | https://web.archive.org/web/20250303152906/https://hacks.mozilla.org/2019/07/add-ons-outage-post-mortem-result/ |
 | 4 | Dropbox Tech Blog | impact | 0.427 | https://blogs.dropbox.com/tech/2014/01/outage-post-mortem/ |
 | 5 | GitHub Availability Report: May 2021 | other | 0.411 | https://github.blog/news-insights/company-news/github-availability-report-may-2021/ |
 
