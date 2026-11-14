@@ -56,10 +56,12 @@ def load_runs(results_dir: Path) -> tuple[list[Run], dict[str, Any] | None]:
     return runs, json.loads(faithfulness.read_text()) if faithfulness.exists() else None
 
 
-def check_comparable(runs: list[Run]) -> None:
-    """Runs are only compared when they scored the same gold set on the same index."""
-    gold = {r.data["gold"]["sha256"] for r in runs}
-    index = {r.data["index"]["version"] for r in runs}
+def check_comparable(runs: list[Run], faithfulness: dict[str, Any] | None = None) -> None:
+    """Results are only reported together when they scored the same gold set on the same index.
+    The faithfulness result counts too: it must match the retrieval runs."""
+    documents = [r.data for r in runs] + ([faithfulness] if faithfulness is not None else [])
+    gold = {d["gold"]["sha256"] for d in documents}
+    index = {d["index"]["version"] for d in documents}
     if len(gold) > 1 or len(index) > 1:
         raise ValueError(
             f"result files differ in gold set ({len(gold)} versions) or index "
@@ -105,7 +107,7 @@ def _header(first: str, extra: Sequence[str] = ()) -> list[str]:
 
 
 def render_summary(runs: list[Run], faithfulness: dict[str, Any] | None) -> str:
-    check_comparable(runs)
+    check_comparable(runs, faithfulness)
     baseline = pick_baseline(runs)
     first = baseline.data
     lines = [

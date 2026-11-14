@@ -36,6 +36,8 @@ def write(dir_, *docs):
 FAITHFULNESS = {
     "run": "faithfulness",
     "date": "2026-11-14",
+    "gold": {"sha256": "g1" * 12},
+    "index": {"version": "i1"},
     "config": {
         "agent_model": "claude-x",
         "judge_model": "deepseek-flash",
@@ -142,3 +144,19 @@ def test_main_writes_summary_and_baseline(results, tmp_path):
 def test_main_with_no_results_reports_an_error(tmp_path, capsys):
     assert summary.main(["--results-dir", str(tmp_path), "--out", str(tmp_path / "s.md")]) == 1
     assert "baseline" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"gold": {"sha256": "other" * 4}}, {"index": {"version": "i2"}}],
+    ids=["gold", "index"],
+)
+def test_a_faithfulness_result_from_another_gold_set_or_index_is_refused(results, changes, capsys):
+    (results / "faithfulness.json").write_text(json.dumps({**FAITHFULNESS, **changes}))
+    runs, faithfulness = summary.load_runs(results)
+    with pytest.raises(ValueError, match="differ in gold set"):
+        summary.render_summary(runs, faithfulness)
+    out = results / "summary.md"
+    argv = ["--results-dir", str(results), "--out", str(out), "--baseline-out", str(results / "b")]
+    assert summary.main(argv) == 1
+    assert "differ" in capsys.readouterr().err and not out.exists()
