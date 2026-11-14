@@ -20,10 +20,14 @@ RAG agent: given an incident description, retrieve similar public postmortems an
 - `uv run outage-matcher serve [--host H] [--port P]` - run the API (`GET /health`, `POST /ask`; 503 until the agent is wired)
 - `docker compose up --build` - db plus the API container (host port `API_PORT`, default 8000)
 - `uv run pytest -m db -o addopts=""` - opt-in tests that need the running Postgres container
+- `uv run python evals/build_gold.py [--dry-run]` - build `evals/gold.jsonl` (needs `DEEPSEEK_API_KEY`; model via `DEEPSEEK_MODEL`)
+- `uv run python -m outage_matcher.evals.run_retrieval --model bge [--chunking neighbor] [--reranker]` - recall@k and MRR to `evals/results/<run>.json`
+- `uv run python evals/run_faithfulness.py [--limit N] [--dry-run]` - agent answers judged by DeepSeek (needs both API keys)
+- `uv run python -m outage_matcher.evals.summary` - write `evals/results/summary.md` and `evals/baseline.json` from the result files
 - `uv run python scripts/compare_embeddings_m1.py` - print the M1 two-model comparison tables
 
 ## Architecture
-`src/outage_matcher/`: ingest (collect, chunk, embed, index), search, config, agent (`tools.py`, `graph.py` LangGraph retrieve/grade/rewrite/answer, `transcript.py`), evals, api. Eval gold set under `evals/`.
+`src/outage_matcher/`: ingest (collect, chunk, embed, index), search, config, agent (`tools.py`, `graph.py` LangGraph retrieve/grade/rewrite/answer, `transcript.py`), evals (`gold.py`, `build_gold.py`, `metrics.py`, `retrieval.py`, `chunking.py`, `rerank.py`, `run_retrieval.py`, `faithfulness.py`, `run_faithfulness.py`, `summary.py`), api. Gold set, results and baseline under `evals/` (thin entry scripts there call the modules).
 
 ## Environment Variables
 ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, VOYAGE_API_KEY, OPENAI_API_KEY, DATABASE_URL, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PORT, API_PORT, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
