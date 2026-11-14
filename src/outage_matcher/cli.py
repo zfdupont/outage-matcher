@@ -7,6 +7,8 @@ import json
 import sys
 from collections.abc import Sequence
 
+import psycopg
+
 from outage_matcher import db
 from outage_matcher.ingest import collect as collect_mod
 from outage_matcher.ingest import index as index_mod
@@ -30,6 +32,13 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     else:
         entries, failures = collect_mod.collect(max_docs=args.max_docs, log=_log)
     docs, parse_failures = index_mod.prepare_documents(entries)
+    if not docs:
+        _log(
+            f"error: none of the {len(entries)} manifest entries could be chunked "
+            f"({len(parse_failures)} failures, for example missing data/raw files); "
+            "index and stats left unchanged. Run `outage-matcher ingest` without --skip-collect."
+        )
+        return 1
     with db.connect() as conn:
         result = index_mod.write_index(conn, docs, log=_log)
     stats = stats_mod.build_stats(docs, failures, parse_failures)
@@ -54,12 +63,19 @@ def cmd_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {value}")
+    return number
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="outage-matcher", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
     ingest = sub.add_parser("ingest", help="collect, chunk, embed and index postmortems")
-    ingest.add_argument("--max-docs", type=int, default=collect_mod.DEFAULT_MAX_DOCS)
+    ingest.add_argument("--max-docs", type=positive_int, default=collect_mod.DEFAULT_MAX_DOCS)
     ingest.add_argument(
         "--skip-collect", action="store_true", help="reuse data/manifest.jsonl and data/raw"
     )
@@ -68,7 +84,7 @@ def build_parser() -> argparse.ArgumentParser:
     find = sub.add_parser("search", help="search indexed postmortems")
     find.add_argument("query")
     find.add_argument("--model", choices=sorted(MODELS), help="default: both models")
-    find.add_argument("--k", type=int, default=5)
+    find.add_argument("--k", type=positive_int, default=5)
     find.add_argument("--system-type", help="restrict to a system type label")
     find.set_defaults(func=cmd_search)
     return parser
@@ -76,7 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (psycopg.OperationalError, RuntimeError, ValueError) as exc:
+        # Unreachable database, missing DATABASE_URL, bad search arguments: one line, exit 1.
+        _log(f"error: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

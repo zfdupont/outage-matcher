@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg
@@ -13,6 +13,10 @@ from outage_matcher.db import EMBEDDING_COLUMNS
 from outage_matcher.ingest.chunk import Chunk, chunk_html
 from outage_matcher.ingest.collect import RAW_DIR, ManifestEntry
 from outage_matcher.ingest.embed import BATCH_SIZE, Embedder, get_embedder
+
+
+class EmptyIndexError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -25,7 +29,6 @@ class PreparedDoc:
 class IndexResult:
     documents: int = 0
     chunks: int = 0
-    failures: list[dict[str, str]] = field(default_factory=list)
 
 
 def prepare_documents(
@@ -65,6 +68,8 @@ def write_index(
     log: Callable[[str], None] = lambda _msg: None,
 ) -> IndexResult:
     """Replace the index contents with `docs`, writing one embedding column per model."""
+    if not docs:
+        raise EmptyIndexError("no documents to index; refusing to replace the index with nothing")
     embedders = embedders or {key: get_embedder(key) for key in EMBEDDING_COLUMNS}
     all_chunks = [(doc, chunk) for doc in docs for chunk in doc.chunks]
     texts = [chunk.text for _doc, chunk in all_chunks]

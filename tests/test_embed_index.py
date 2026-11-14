@@ -106,3 +106,15 @@ def test_write_index_stores_both_embedding_columns(tmp_path):
         indexes = {r[0] for r in conn.execute("SELECT indexname FROM pg_indexes").fetchall()}
         assert {"chunks_bge_hnsw", "chunks_minilm_hnsw"} <= indexes
         conn.rollback()
+
+
+def test_write_index_refuses_empty_docs():
+    class NoDb:
+        def transaction(self):
+            raise AssertionError("must not touch the database")
+
+        def execute(self, *a, **kw):
+            raise AssertionError("must not touch the database")
+
+    with pytest.raises(index.EmptyIndexError):
+        index.write_index(NoDb(), [], {"bge": FakeEmbedder(), "minilm": FakeEmbedder()})
