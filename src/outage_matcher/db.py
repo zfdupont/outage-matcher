@@ -14,6 +14,7 @@ EMBEDDING_COLUMNS: dict[str, str] = {
     "minilm": "embedding_minilm",
 }
 EMBEDDING_DIM = 384
+CONNECT_TIMEOUT = 10  # seconds; an unreachable host fails fast instead of hanging a request
 
 SCHEMA_STATEMENTS: tuple[str, ...] = (
     "CREATE EXTENSION IF NOT EXISTS vector",
@@ -66,7 +67,7 @@ def create_schema(conn: psycopg.Connection) -> None:
 
 def connect(url: str | None = None, *, ensure_schema: bool = True) -> psycopg.Connection:
     """Open a connection with the pgvector adapter registered."""
-    conn = psycopg.connect(url or database_url())
+    conn = psycopg.connect(url or database_url(), connect_timeout=CONNECT_TIMEOUT)
     if ensure_schema:
         create_schema(conn)
     register_vector(conn)

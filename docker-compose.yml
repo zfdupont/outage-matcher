@@ -24,6 +24,11 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      # Optional agent overrides; empty means the defaults in config.py
+      AGENT_MODEL: ${AGENT_MODEL:-}
+      AGENT_MAX_RETRIES: ${AGENT_MAX_RETRIES:-}
+      AGENT_REQUEST_TIMEOUT: ${AGENT_REQUEST_TIMEOUT:-}
+      AGENT_API_MAX_RETRIES: ${AGENT_API_MAX_RETRIES:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
