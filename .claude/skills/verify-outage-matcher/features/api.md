@@ -4,7 +4,7 @@
 
 ## Sub-features
 - typed request and response, citations as structured fields
-- 503 until an agent is wired; 422 for invalid input, JSON errors with no stack traces
+- `/ask` runs the real agent; 503 without a real `ANTHROPIC_API_KEY` (missing or the `your-...` placeholder) or when the database or search backend is down, 502 when the model API call fails, 422 for invalid input; JSON errors, no stack traces
 
 ## How to get to it (user POV)
 `uv run outage-matcher serve --port 58000`, or `docker compose up --build` (host port `API_PORT`).
@@ -17,8 +17,9 @@ until curl -sf localhost:58000/health; do sleep 1; done
 curl -s -X POST localhost:58000/ask -H 'content-type: application/json' -d '{"question":"s3 style object store returned 503 after capacity change"}' | tee .verify/evidence/api-ask.json
 kill "$(cat .verify/serve.pid)"
 ```
-Proof: `/health` returns ok; `/ask` returns answer and citations (or a documented 503 if the agent is not wired in this checkout yet). `{"question": ""}` returns 422 JSON.
+Proof: `/health` returns ok; `/ask` returns `answer`, `likely_cause`, `suggested_fix` and `citations` whose doc ids exist in `postmortems` (it uses the Anthropic API, a few cents per request, like `ask`). A 503 from `/ask` is a failed check when a real key is configured. `{"question": ""}` returns 422 JSON.
 
 ## Gotchas
-- Check `git log` or the README to see whether `/ask` is wired to the real agent in this checkout.
+- `serve` logs a warning at startup when the key is missing or still the placeholder; `/ask` then answers 503 until the process is restarted with a real key.
+- In the container, `ANTHROPIC_API_KEY` must be in the environment: compose forwards it from `.env`, along with the `AGENT_*` and `LANGFUSE_*` variables.
 - Kill only the PID in `.verify/serve.pid`.

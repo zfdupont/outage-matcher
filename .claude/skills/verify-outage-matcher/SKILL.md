@@ -50,7 +50,7 @@ uv run outage-matcher ask "checkout latency spiked after a config push to our lo
 
 Expect: a likely cause, a suggested fix, citations that name real indexed postmortems with URLs, and a token usage line; the transcript file lists each tool call. An honest "no close match" abstention is valid output for a vague query, so use a specific incident description. Exit code 1 with one `error:` line means a backend or API failure, not a no-match.
 
-API (after the agent is wired into the API, see `features/api.md`):
+API (`/ask` runs the agent, so it needs the same API key and costs a few cents per request; see `features/api.md`):
 
 ```bash
 uv run outage-matcher serve --port 58000 &   # record the PID, kill only that PID
