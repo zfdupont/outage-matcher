@@ -13,9 +13,16 @@ from outage_matcher.agent.models import (
     AgentAnswer,
     AgentResult,
     Citation,
+    RetrievalError,
     Usage,
 )
-from outage_matcher.agent.tools import TOOL_DEFINITIONS, RetrievedChunk, ToolContext, run_tool
+from outage_matcher.agent.tools import (
+    BACKEND_ERROR,
+    TOOL_DEFINITIONS,
+    RetrievedChunk,
+    ToolContext,
+    run_tool,
+)
 from outage_matcher.config import AgentConfig
 
 MAX_TOOL_TURNS = 4  # model calls inside one retrieve node
@@ -185,6 +192,7 @@ class OutageAgent:
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
         usage, events = state["usage"], list(state["events"])
         found: list[RetrievedChunk] = []
+        backend_failures: list[str] = []
         for _turn in range(MAX_TOOL_TURNS):
             response, usage = self._call(
                 usage,
@@ -203,6 +211,9 @@ class OutageAgent:
             for call in calls:
                 result = run_tool(self.ctx, call.name, call.input)
                 found = _merge(found, result.retrieved)
+                error = result.content.get("error") or {}
+                if error.get("type") == BACKEND_ERROR:
+                    backend_failures.append(error.get("message", "unknown error"))
                 events.append(
                     {
                         "type": "tool_call",
@@ -222,6 +233,11 @@ class OutageAgent:
                     }
                 )
             messages.append({"role": "user", "content": results})
+        if backend_failures and not found:
+            # The search never ran properly; reporting "no close match" would mislead the user.
+            raise RetrievalError(
+                f"search failed: {backend_failures[0]}; this is not a no-match result"
+            )
         return {
             "pending": found,
             "retrieved": _merge(state["retrieved"], found),

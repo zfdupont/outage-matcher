@@ -256,3 +256,17 @@ def test_ask_api_error_is_a_one_line_error(ask_env, monkeypatch, capsys):
     assert cli.main(["ask", "q"]) == 1
     err = capsys.readouterr().err
     assert err.startswith("error: Anthropic API call failed") and "Traceback" not in err
+
+
+def test_ask_search_failure_is_a_one_line_error_not_a_no_match(ask_env, monkeypatch, capsys):
+    from outage_matcher.agent.models import RetrievalError
+
+    class Broken:
+        def ask(self, question):
+            raise RetrievalError("search failed: database is down; this is not a no-match result")
+
+    monkeypatch.setattr(cli, "_build_agent", lambda *a: Broken())
+    assert cli.main(["ask", "q"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err.startswith("error: search failed: database is down")
+    assert "No close match" not in captured.out and "Traceback" not in captured.err

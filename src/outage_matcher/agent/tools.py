@@ -15,6 +15,7 @@ import psycopg
 from outage_matcher.ingest.embed import Embedder
 from outage_matcher.search import search as search_chunks
 
+BACKEND_ERROR = "tool_failed"  # error type for database or embedding failures, not model mistakes
 DEFAULT_K = 5
 MAX_TOOL_K = 20
 SNIPPET_CHARS = 800  # chunk text shown to the model per search hit
@@ -262,7 +263,7 @@ def run_tool(ctx: ToolContext, name: str, args: Any) -> ToolResult:
         return _error("invalid_arguments", str(exc))
     except Exception as exc:  # the agent loop must survive any tool failure
         _end_transaction(ctx.conn, ok=False)
-        return _error("tool_failed", f"{type(exc).__name__}: {exc}")
+        return _error(BACKEND_ERROR, f"{type(exc).__name__}: {exc}")
     _end_transaction(ctx.conn, ok=True)
     return result
 

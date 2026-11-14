@@ -10,7 +10,7 @@ from fakes import (
 )
 from outage_matcher.agent import tools
 from outage_matcher.agent.graph import OutageAgent
-from outage_matcher.agent.models import NO_MATCH_CAUSE
+from outage_matcher.agent.models import NO_MATCH_CAUSE, RetrievalError
 from outage_matcher.agent.tools import ToolContext
 from outage_matcher.config import AgentConfig
 
@@ -263,3 +263,61 @@ def test_tool_turn_cap_stops_a_runaway_model(search_log):
     )
     make_agent(client, max_retries=0).ask(QUESTION)
     assert len(client.calls_for("retrieve")) == 4
+
+
+def test_backend_failure_raises_instead_of_reporting_no_match(monkeypatch):
+    def broken_search(*args, **kwargs):
+        raise RuntimeError("connection to the database was lost")
+
+    monkeypatch.setattr(tools, "search_chunks", broken_search)
+    client = FakeAnthropic(retrieve=[search_call(), response(text_block("ok"))])
+    with pytest.raises(RetrievalError, match="search failed.*connection to the database was lost"):
+        make_agent(client).ask(QUESTION)
+    assert client.calls_for("submit_grades") == []  # failed fast, no retries or grading
+
+
+def test_backend_failure_after_an_empty_search_still_raises(monkeypatch):
+    calls = []
+
+    def flaky_search(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            return []
+        raise RuntimeError("embedding model failed to load")
+
+    monkeypatch.setattr(tools, "search_chunks", flaky_search)
+    client = FakeAnthropic(
+        retrieve=[search_call(), response(text_block("ok"))] * 2,
+        submit_query=[rewrite("again")],
+    )
+    with pytest.raises(RetrievalError, match="embedding model failed to load"):
+        make_agent(client).ask(QUESTION)
+
+
+def test_backend_failure_recovered_within_the_pass_is_not_an_error(monkeypatch):
+    calls = []
+
+    def flaky_search(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("transient")
+        return [make_hit(1)]
+
+    monkeypatch.setattr(tools, "search_chunks", flaky_search)
+    client = FakeAnthropic(
+        retrieve=[search_call(), search_call(), response(text_block("ok"))],
+        submit_grades=[grades(True)],
+        submit_answer=[answer([1])],
+    )
+    result = make_agent(client).ask(QUESTION)
+    assert not result.answer.no_match
+    assert [e["is_error"] for e in result.events if e["type"] == "tool_call"] == [True, False]
+
+
+def test_model_mistakes_are_not_backend_failures(search_log):
+    client = FakeAnthropic(
+        retrieve=[response(tool_block("search_incidents", {"k": 3})), response(text_block("ok"))],
+        submit_query=[rewrite("x")],
+    )
+    result = make_agent(client, max_retries=0).ask(QUESTION)
+    assert result.answer.no_match  # invalid arguments stay a normal no-match, no exception

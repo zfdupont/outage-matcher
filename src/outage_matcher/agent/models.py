@@ -12,6 +12,10 @@ NO_MATCH_FIX = (
 )
 
 
+class RetrievalError(RuntimeError):
+    """Search could not run (database or embedding failure), so "no match" would be a lie."""
+
+
 @dataclass(frozen=True)
 class Citation:
     doc_id: int
