@@ -19,3 +19,8 @@
 - [ ] Investigate the 5 unexplained abstentions (q006, q009, q027, q029, q032) in evals/results/faithfulness.json
 - [ ] Repeat the faithfulness run several times and report a mean and spread (evals/run_faithfulness.py)
 - [ ] Strip dashes from gold queries only if the whole eval is rerun (evals/gold.jsonl)
+
+## Follow-ups from job 005-m4-ops
+- [ ] Watch the first GitHub Actions run of eval.yml and fix what only shows up there (.github/workflows/eval.yml)
+- [ ] Identity-check the confirmed near-duplicate doc ids in gate index, not just existence (src/outage_matcher/evals/gate.py)
+- [ ] Commit the gate output behind the index version cited in docs/ci-eval-gate.md

@@ -109,13 +109,19 @@
    "worktree": "/Users/zfdupont/outage-matcher-factory/005-m4-ops",
    "builder": "",
    "lane": "milestone",
-   "stage": "build",
-   "round": 1,
-   "rework": 0,
-   "reviews": {},
+   "stage": "merged",
+   "round": 3,
+   "rework": 2,
+   "reviews": {
+    "rules": "PASS",
+    "logic": "PASS",
+    "maintainability": "PASS",
+    "eval-rigor": "PASS",
+    "api-contract": "PASS"
+   },
    "history": [],
    "note": "",
-   "updated": "2026-11-14T05:53:45.403978+00:00"
+   "updated": "2026-11-14T06:55:53.325620+00:00"
   }
  ]
 }
