@@ -25,27 +25,38 @@ Values in `.env` (placeholders in `.env.example`, never commit `.env`):
 
 ## Architecture
 
-    public postmortems (URLs in data/manifest.jsonl)
-            |  outage-matcher ingest  (collect -> chunk by section -> embed with bge + minilm)
-            v
-    Postgres + pgvector  <----------------------------------------------+
-    (postmortems, chunks, HNSW cosine index per model)                   |
-            ^                                                            |
-            |  search_incidents / get_postmortem / filter_by_system_type |
-            |                                                            |
-    LangGraph agent  (src/outage_matcher/agent)                          |
-      retrieve --> grade --relevant--> answer --> likely cause, fix, citations
-         ^           |                                                   |
-         +-- rewrite +--none relevant, retries left                      |
-            ^                                                            |
-            |  OutageAgent.ask(question)                                 |
-    FastAPI  (src/outage_matcher/api)        CLI ask / serve             |
-      GET /health, POST /ask  <---- Docker image, compose `api` service  |
-            |                                                            |
-            +--> Langfuse (optional): a trace per question, spans per node and tool call
+```mermaid
+flowchart TD
+    src["Public postmortems<br/>(URLs in data/manifest.jsonl)"]
+    ingest["outage-matcher ingest<br/>collect, chunk by section,<br/>embed with bge and minilm"]
+    db[("Postgres + pgvector<br/>postmortems, chunks,<br/>HNSW cosine index per model")]
 
-    Evals (src/outage_matcher/evals, evals/): gold set -> retrieval recall@k and MRR, faithfulness
-    judge, summary and baseline -> CI gate (.github/workflows/eval.yml) fails on a regression.
+    subgraph agent["LangGraph agent (src/outage_matcher/agent)"]
+        direction LR
+        retrieve["retrieve<br/>(Claude tool use)"]
+        grade{"grade relevance"}
+        rewrite["rewrite query"]
+        answer["answer:<br/>likely cause, fix, citations"]
+        retrieve --> grade
+        grade -->|relevant| answer
+        grade -->|"none relevant,<br/>retries left"| rewrite
+        rewrite --> retrieve
+    end
+
+    api["FastAPI (src/outage_matcher/api)<br/>GET /health, POST /ask<br/>Docker image, compose api service"]
+    cli["CLI: ask, serve, search"]
+    langfuse["Langfuse (optional)<br/>trace per question,<br/>spans per node and tool call"]
+    evals["Evals (src/outage_matcher/evals)<br/>gold set, recall@k, MRR,<br/>faithfulness judge, charts"]
+    gate["CI eval gate<br/>.github/workflows/eval.yml<br/>fails on a regression"]
+
+    src --> ingest --> db
+    retrieve <-->|"search_incidents, get_postmortem,<br/>filter_by_system_type"| db
+    api -->|"OutageAgent.ask(question)"| agent
+    cli --> agent
+    agent -.-> langfuse
+    evals -->|queries| db
+    evals --> gate
+```
 
 ## Commands
 
