@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from outage_matcher.agent.models import AgentResult
+from outage_matcher.agent.models import DROPPED_CITATION_NOTE, AgentResult
 from outage_matcher.agent.tools import RetrievedChunk
 from outage_matcher.evals.deepseek import (
     DeepSeekClient,
@@ -149,3 +149,18 @@ def summarize(per_query: list[dict[str, Any]]) -> dict[str, Any]:
         "claim_support_rate": supported / total if total else None,
         "faithful_answer_rate": fully / len(judged) if judged else None,
     }
+
+
+def abstained_after_dropped_citation(record: dict[str, Any]) -> bool:
+    """The agent abstained because every citation it gave was dropped by the citation check."""
+    notes = record.get("answer_notes") or []
+    return bool(record.get("no_match")) and any(n.startswith(DROPPED_CITATION_NOTE) for n in notes)
+
+
+def abstained_with_relevant_chunks(record: dict[str, Any]) -> bool:
+    """Abstained although the grader accepted chunks, and not through a dropped citation."""
+    return (
+        bool(record.get("no_match"))
+        and (record.get("graded_relevant") or 0) > 0
+        and not abstained_after_dropped_citation(record)
+    )

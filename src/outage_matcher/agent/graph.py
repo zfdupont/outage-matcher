@@ -8,6 +8,7 @@ from typing import Any, Literal, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from outage_matcher.agent.models import (
+    DROPPED_CITATION_NOTE,
     NO_MATCH_CAUSE,
     NO_MATCH_FIX,
     AgentAnswer,
@@ -358,7 +359,7 @@ class OutageAgent:
                 continue
             chunk = by_doc[value]
             citations.append(Citation(chunk.doc_id, chunk.title, chunk.url, chunk.section_type))
-        notes = [f"dropped citation of a document that was not retrieved: {d!r}" for d in dropped]
+        notes = [f"{DROPPED_CITATION_NOTE}: {d!r}" for d in dropped]
         cause, fix = data.get("likely_cause"), data.get("suggested_fix")
         if not citations or not isinstance(cause, str) or not isinstance(fix, str):
             notes.append("answer had no valid citations or text; returning no match")

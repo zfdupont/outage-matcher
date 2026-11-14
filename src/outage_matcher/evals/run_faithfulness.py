@@ -160,6 +160,7 @@ def result_document(
             "agent_retrieval": "pgvector search, bge embeddings, held-out chunks hidden per query",
             "judge_model": judge_model,
             "judge_temperature": faithfulness.JUDGE_TEMPERATURE,
+            "judge_thinking": deepseek.THINKING["type"],
             "judge_prompt": {
                 "system": faithfulness.JUDGE_SYSTEM,
                 "user_template": faithfulness.JUDGE_USER_TEMPLATE,

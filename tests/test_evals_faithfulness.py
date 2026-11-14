@@ -244,6 +244,7 @@ def test_result_document_records_models_judge_prompt_and_temperature(tmp_path):
         "judge-y",
         0.0,
     )
+    assert cfg["judge_thinking"] == "disabled"
     assert cfg["judge_prompt"]["user_template"] == faithfulness.JUDGE_USER_TEMPLATE
     assert doc["metrics"]["claim_support_rate"] == 1.0
     assert doc["tokens"]["judge"]["input_tokens"] == 50
@@ -269,3 +270,31 @@ def test_main_without_keys_stops_with_a_note(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(run_faithfulness.deepseek, "api_key", lambda: "k")
     assert run_faithfulness.main(["--gold", str(path), "--out", str(tmp_path / "o.json")]) == 1
     assert "ANTHROPIC_API_KEY" in capsys.readouterr().err
+
+
+def test_abstention_classifiers_use_the_agents_dropped_citation_note():
+    from outage_matcher.agent.models import DROPPED_CITATION_NOTE
+
+    dropped = {
+        "no_match": True,
+        "graded_relevant": 2,
+        "answer_notes": [f"{DROPPED_CITATION_NOTE}: 0"],
+    }
+    silent = {
+        "no_match": True,
+        "graded_relevant": 2,
+        "answer_notes": ["answer had no valid citations"],
+    }
+    nothing = {"no_match": True, "graded_relevant": 0, "answer_notes": []}
+    answered = {
+        "no_match": False,
+        "graded_relevant": 2,
+        "answer_notes": [f"{DROPPED_CITATION_NOTE}: 5"],
+    }
+    assert faithfulness.abstained_after_dropped_citation(dropped)
+    assert not faithfulness.abstained_after_dropped_citation(answered)
+    assert not faithfulness.abstained_after_dropped_citation(silent)
+    assert faithfulness.abstained_with_relevant_chunks(silent)
+    assert not faithfulness.abstained_with_relevant_chunks(dropped)
+    assert not faithfulness.abstained_with_relevant_chunks(nothing)
+    assert not faithfulness.abstained_with_relevant_chunks({"no_match": True})  # old result rows

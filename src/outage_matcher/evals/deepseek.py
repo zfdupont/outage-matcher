@@ -14,6 +14,9 @@ from dotenv import load_dotenv
 
 BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-flash"  # the one id containing "flash" in GET /models (2026-11-14)
+# The flash model reasons by default, which spends max_tokens and ignores temperature; plain
+# replies keep temperature 0 meaningful for the judge. Recorded in result files from now on.
+THINKING: dict[str, str] = {"type": "disabled"}
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
@@ -120,9 +123,7 @@ class DeepSeekClient:
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_tokens,
-                # The flash model reasons by default, which spends max_tokens and ignores
-                # temperature; plain replies keep temperature 0 meaningful for the judge.
-                "thinking": {"type": "disabled"},
+                "thinking": THINKING,
                 "response_format": {"type": "json_object"},
             }
         )

@@ -10,7 +10,7 @@ from fakes import (
 )
 from outage_matcher.agent import tools
 from outage_matcher.agent.graph import OutageAgent
-from outage_matcher.agent.models import NO_MATCH_CAUSE, RetrievalError
+from outage_matcher.agent.models import DROPPED_CITATION_NOTE, NO_MATCH_CAUSE, RetrievalError
 from outage_matcher.agent.tools import ToolContext
 from outage_matcher.config import AgentConfig
 
@@ -400,4 +400,4 @@ def test_citing_an_excerpt_position_instead_of_a_doc_id_is_dropped_and_abstains(
     )
     result = make_agent(client).ask(QUESTION)
     assert result.answer.no_match and result.answer.citations == []
-    assert any("dropped citation" in n and "0" in n for n in result.answer.notes)
+    assert any(n.startswith(DROPPED_CITATION_NOTE) and "0" in n for n in result.answer.notes)
